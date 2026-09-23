@@ -11,5 +11,6 @@ Requires-Dist: scipy>=1.10.0
 Requires-Dist: statsmodels>=0.14.0
 Requires-Dist: sentence-transformers>=2.2.0
 Requires-Dist: typer>=0.9.0
+Requires-Dist: requests>=2.31.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0.0; extra == "dev"

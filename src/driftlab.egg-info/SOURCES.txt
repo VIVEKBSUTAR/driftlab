@@ -7,6 +7,8 @@ src/driftlab.egg-info/requires.txt
 src/driftlab.egg-info/top_level.txt
 src/driftlab/adapters/__init__.py
 src/driftlab/adapters/base.py
+src/driftlab/adapters/mock.py
+src/driftlab/adapters/ollama.py
 src/driftlab/api/__init__.py
 src/driftlab/api/main.py
 src/driftlab/cli/__init__.py
