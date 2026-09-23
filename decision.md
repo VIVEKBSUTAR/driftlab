@@ -13,8 +13,8 @@ DriftLab is a statistical framework for behavioral drift detection and validatio
 - **Phase 0 & 1 Completed**: Folder structure, dependencies (`pyproject.toml`), and skeletons for all 13 modules initialized.
 - **Phase 2 Completed**: Core statistics engine (`driftlab.stats`) implemented and calibrated for false positive rates and nominal coverage.
 - **Phase 3 Completed**: Model Adapters (`MockAdapter` and `OllamaAdapter`) implemented with unit tests.
-- **Phase 4 In Progress**: Implementing Database schemas (SQLAlchemy/SQLite) and JSONL append-only persistence.
-- **Phase 5 Next**: Implement runner and metric functions.
+- **Phase 4 Completed**: Database schemas (SQLAlchemy/SQLite) and JSONL append-only persistence implemented and tested.
+- **Phase 5 Next**: Implementing runner (task orchestrator, repeat sampler, JSONL writer) and metrics engine (exact match, embedding similarity, format validity).
 
 ## Module Connectivity
 - **`driftlab.config`**: Validates configuration schemas across tasks, experiments, and policies.
@@ -49,3 +49,7 @@ DriftLab is a statistical framework for behavioral drift detection and validatio
 ### Phase 4: Database Schemas and JSONL Persistence
 - **Feature**: SQLAlchemy ORM models (`Experiment`, `ModelSnapshot`, `DatasetVersion`, `Task`, `Run`, `Observation`, `MetricResult`, `PromptAggregate`, `StatisticalTest`, `RiskPolicy`, `DriftResult`) and append-only JSONL logging.
 - **Reasoning**: Per specification, the database is derived; the append-only JSONL file is the immutable source of truth for all raw observations. SQLite provides local, zero-config relational queries without operational overhead.
+
+### Phase 5: Runner and Metrics Engine
+- **Feature**: Task execution orchestration (`driftlab.runner.core`) with repeat sampling, JSONL append-only persistence, and pluggable metrics calculation (`driftlab.metrics.functions`).
+- **Reasoning**: Prompts are the primary unit of analysis; repeats estimate within-prompt noise. Writing each output immediately to JSONL ensures resilience against process interruption. Metric calculation is kept functionally pure to decouple scoring from execution and statistics.

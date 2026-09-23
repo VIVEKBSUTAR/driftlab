@@ -14,3 +14,5 @@ class GenerationConfig(BaseModel):
     top_p: float = 1.0
     max_tokens: int = 1024
     stop_sequences: Optional[list[str]] = None
+    seed: Optional[int] = None
+    timeout_seconds: float = 60.0

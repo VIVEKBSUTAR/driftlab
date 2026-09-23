@@ -4,9 +4,10 @@ Mock adapter for testing the pipeline without a GPU.
 
 import time
 import numpy as np
-from typing import Callable, Optional
+from typing import Callable, List, Optional, Union
 from driftlab.adapters.base import ModelAdapter, GenerationResult, ModelDescription
 from driftlab.config.schemas import GenerationConfig
+
 
 class MockAdapter(ModelAdapter):
     """
@@ -14,15 +15,31 @@ class MockAdapter(ModelAdapter):
     can be tested without a GPU or Ollama running.
     """
     
-    def __init__(self, 
-                 response_sampler: Callable[[str], str], 
-                 latency_sampler: Callable[[], float],
-                 seed: int = 42):
-        self.response_sampler = response_sampler
-        self.latency_sampler = latency_sampler
+    def __init__(
+        self, 
+        response_sampler: Optional[Callable[[str], str]] = None, 
+        latency_sampler: Optional[Callable[[], float]] = None,
+        seed: int = 42,
+        outputs: Optional[List[str]] = None,
+    ):
         self.rng = np.random.default_rng(seed)
+        self.outputs = outputs
+        self._output_idx = 0
         
-    def generate(self, prompt: str, system_prompt: str, config: GenerationConfig) -> GenerationResult:
+        if response_sampler is not None:
+            self.response_sampler = response_sampler
+        elif outputs is not None and len(outputs) > 0:
+            def _cycle_sampler(_prompt: str) -> str:
+                chosen = self.outputs[self._output_idx % len(self.outputs)]
+                self._output_idx += 1
+                return chosen
+            self.response_sampler = _cycle_sampler
+        else:
+            self.response_sampler = lambda _prompt: "mock response"
+
+        self.latency_sampler = latency_sampler or (lambda: 5.0)
+        
+    def generate(self, prompt: str, system_prompt: Optional[str] = None, config: Optional[GenerationConfig] = None) -> GenerationResult:
         start_time = time.time()
         
         # Simulate generation delay
@@ -39,7 +56,7 @@ class MockAdapter(ModelAdapter):
             "finish_reason": "stop",
             "prompt_tokens": len(prompt.split()),  # Naive token count for mock
             "completion_tokens": len(text.split()), # Naive token count for mock
-            "latency_ms": actual_latency_ms
+            "latency_ms": actual_latency_ms,
         }
         
     def describe(self) -> ModelDescription:
@@ -48,5 +65,5 @@ class MockAdapter(ModelAdapter):
             "identifier": "mock-v1",
             "digest": "00000000",
             "quantization": "none",
-            "backend_version": "0.1.0"
+            "backend_version": "0.1.0",
         }
