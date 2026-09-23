@@ -14,7 +14,9 @@ DriftLab is a statistical framework for behavioral drift detection and validatio
 - **Phase 2 Completed**: Core statistics engine (`driftlab.stats`) implemented and calibrated for false positive rates and nominal coverage.
 - **Phase 3 Completed**: Model Adapters (`MockAdapter` and `OllamaAdapter`) implemented with unit tests.
 - **Phase 4 Completed**: Database schemas (SQLAlchemy/SQLite) and JSONL append-only persistence implemented and tested.
-- **Phase 5 Next**: Implementing runner (task orchestrator, repeat sampler, JSONL writer) and metrics engine (exact match, embedding similarity, format validity).
+- **Phase 5 Completed**: Runner orchestration with repeat sampling and pure evaluation metrics (`exact_match`, `embedding_similarity`, `json_validity`, `sequence_similarity`).
+- **Phase 6 Completed**: Fingerprinting (`driftlab.fingerprint`), Reporting formatters (`driftlab.reporting`), CLI (`driftlab.cli`), and API wrappers (`driftlab.api`).
+- **Phase 7 Completed**: Drift decision engine rules (`driftlab.drift`) and Risk policies (`driftlab.risk`) implemented adhering to the 6-level ordered decision hierarchy.
 
 ## Module Connectivity
 - **`driftlab.config`**: Validates configuration schemas across tasks, experiments, and policies.
@@ -31,7 +33,7 @@ DriftLab is a statistical framework for behavioral drift detection and validatio
 - **`driftlab.drift`**: Combines stats and risk policy to produce actionable drift verdicts.
 - **`driftlab.fingerprint`**: Produces cryptographic digests of models and datasets.
 - **`driftlab.reporting`**: Formats summaries into tables, markdown, or JSON.
-- **`driftlab.api` & `driftlab.cli`**: Thin wrappers invoking runner and querying store.
+- **`driftlab.api` & `driftlab.cli`**: Thin wrappers invoking runner, drift analysis, and querying store.
 
 ## Feature Log & Reasoning
 ### Phase 1: Module Skeletons
@@ -53,3 +55,17 @@ DriftLab is a statistical framework for behavioral drift detection and validatio
 ### Phase 5: Runner and Metrics Engine
 - **Feature**: Task execution orchestration (`driftlab.runner.core`) with repeat sampling, JSONL append-only persistence, and pluggable metrics calculation (`driftlab.metrics.functions`).
 - **Reasoning**: Prompts are the primary unit of analysis; repeats estimate within-prompt noise. Writing each output immediately to JSONL ensures resilience against process interruption. Metric calculation is kept functionally pure to decouple scoring from execution and statistics.
+
+### Phase 6: Fingerprinting, Reporting, CLI & API Wrappers
+- **Feature**: Cryptographic hashing (`driftlab.fingerprint`), rich report formatters in Markdown/JSON (`driftlab.reporting`), Typer CLI commands (`driftlab.cli`), and FastAPI endpoints (`driftlab.api`).
+- **Reasoning**: Provides reproducible asset versioning and clean user interfaces as thin callers over the decoupled core engine.
+
+### Phase 7: Drift Decision Rules and Risk Policies
+- **Feature**: Ordered decision hierarchy (`evaluate_drift` and `compare_runs_for_drift`) with configurable risk policies (`RiskPolicyConfig` across low, medium, high, and critical risk tiers).
+- **Reasoning**: Ensures that differences are not blindly labeled as drift. Adheres strictly to the 6 ordered rules:
+  1. Insufficient data if prompt/repeat count below minimum.
+  2. High-risk regression if high/critical tier, harmful direction, statistically significant, and beyond margin.
+  3. Meaningful drift if significant and beyond practical margin.
+  4. Statistically detected but low practical impact if significant and within margin.
+  5. No meaningful drift if entire confidence interval lies inside margin.
+  6. Insufficient evidence otherwise (absence of statistical significance is never reported as proof of no drift).
