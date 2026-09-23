@@ -28,19 +28,28 @@ pip install -e ".[dev]"
 
 ## Running the Project
 
-Currently, the CLI and API are under development. 
-
 ### Running Tests
-To run the test suite, specifically calibration tests for the statistics engine, run:
+To run the full test suite (including statistical calibration tests and store unit tests):
 ```bash
 pytest tests/
 ```
+
+To run only the store/database tests:
+```bash
+pytest tests/unit/test_store.py
+```
+
+### Database & Storage Architecture
+- **Raw Observations (Source of Truth)**: Runs write their raw generation outputs directly into an append-only JSONL file (e.g. `data/runs/<run_id>.jsonl`).
+- **Relational Store (Derived)**: SQLite database (`driftlab.db`) is derived from the JSONL files using `driftlab.store.db.create_tables()` and `driftlab.store.jsonl.ingest_jsonl_to_db()`.
+- **Zero Overhead**: No external database server (PostgreSQL/MySQL) is needed. Everything runs locally on SQLite.
+
+### Model Backends
+- **Mock Backend**: `MockAdapter` is used for in-memory, reproducible testing without requiring local GPUs or model weights.
+- **Ollama Backend**: For actual local LLM runs, ensure Ollama is installed and running locally on `http://localhost:11434`.
 
 ### Starting the API (Future)
 When the FastAPI app is ready, it will be started using `uvicorn`:
 ```bash
 uvicorn driftlab.api.main:app --reload
 ```
-
-## Workflows
-- **Model Inference**: Model interactions are handled locally via Ollama (or a mock adapter). You will need `ollama` installed and running locally to use real models in the future.

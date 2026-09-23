@@ -6,41 +6,46 @@ DriftLab is a statistical framework for behavioral drift detection and validatio
 ## Architectural Principles
 1. **Separation of Concerns**: Core statistics, drift decisions, and risk logic live in a plain Python package (`driftlab.stats`, `driftlab.drift`, `driftlab.risk`). They have zero dependencies on web frameworks (FastAPI) or databases (SQLAlchemy).
 2. **Deterministic Stochasticity**: Every statistical function must be pure and take a `numpy.random.Generator` explicitly to guarantee testability.
-3. **Data Source of Truth**: Raw model outputs are appended to a JSONL file per run. The SQLite database is derived from this JSONL file, ensuring the database is reconstructable and the JSONL is the ultimate source of truth.
+3. **Data Source of Truth**: Raw model outputs are written to an append-only JSONL file per run before touching the database. The SQLite database is derived from this JSONL file, ensuring reproducibility and tamper-evident observation storage.
+4. **No Premature Complexity**: No Redis, Celery, RabbitMQ, or microservices. Background runs are local processes tracked in SQLite.
 
 ## Current Development State
-- **Phase 0 & 1 Completed**: Basic folder structure, project dependencies (`pyproject.toml`), and empty module skeletons initialized.
-- **Phase 2 Completed**: Implemented the core statistics engine (`driftlab.stats`) with exact signatures, calibrated for false-positive rates and nominal coverage.
-- **Phase 3 Completed**: Implemented Model Adapters (`MockAdapter` and `OllamaAdapter`) with unit tests.
-- **Phase 4 Next**: Implementing Database schemas and JSONL persistence.
+- **Phase 0 & 1 Completed**: Folder structure, dependencies (`pyproject.toml`), and skeletons for all 13 modules initialized.
+- **Phase 2 Completed**: Core statistics engine (`driftlab.stats`) implemented and calibrated for false positive rates and nominal coverage.
+- **Phase 3 Completed**: Model Adapters (`MockAdapter` and `OllamaAdapter`) implemented with unit tests.
+- **Phase 4 In Progress**: Implementing Database schemas (SQLAlchemy/SQLite) and JSONL append-only persistence.
+- **Phase 5 Next**: Implement runner and metric functions.
 
 ## Module Connectivity
-- **`driftlab.config`**: Used globally to validate and load configurations.
-- **`driftlab.datasets`**: Loads prompts to be fed to the `runner`.
-- **`driftlab.adapters`**: Used by the `runner` to generate outputs via Mock or Ollama backends.
-- **`driftlab.runner`**: Calls `adapters`, computes `metrics`, and outputs JSONL observations.
-- **`driftlab.metrics`**: Feeds metric values into `driftlab.stats`.
-- **`driftlab.stats`**: Pure functions called by `driftlab.drift` to test for significance.
-- **`driftlab.drift`**: Uses outputs from `stats` and policies from `risk` to make a final decision.
-- **`driftlab.api` & `driftlab.cli`**: Top-level wrappers that invoke the `runner`, query the `store`, and present `reporting`.
+- **`driftlab.config`**: Validates configuration schemas across tasks, experiments, and policies.
+- **`driftlab.datasets`**: Loads, validates, and hashes prompt datasets.
+- **`driftlab.adapters`**: Interacts with LLM backends (Mock, Ollama) via unified interface.
+- **`driftlab.runner`**: Executes prompts against adapters, logs raw outputs to JSONL (`driftlab.store.jsonl`), and triggers metric calculations.
+- **`driftlab.metrics`**: Pure functions computing numerical differences/scores from model outputs.
+- **`driftlab.store`**:
+  - `jsonl.py`: Append-only raw output recorder (source of truth).
+  - `models.py`: SQLAlchemy ORM definitions for experiment tracking, runs, tasks, observations, metric results, statistical tests, risk policies, and drift results.
+  - `db.py`: Engine, session factories, and ingestion utilities mapping JSONL to SQLite.
+- **`driftlab.stats`**: Pure functions for hypothesis testing, noise floor calculation, and multiple testing adjustments.
+- **`driftlab.risk`**: Defines risk tiers, policy thresholds, and practical margins.
+- **`driftlab.drift`**: Combines stats and risk policy to produce actionable drift verdicts.
+- **`driftlab.fingerprint`**: Produces cryptographic digests of models and datasets.
+- **`driftlab.reporting`**: Formats summaries into tables, markdown, or JSON.
+- **`driftlab.api` & `driftlab.cli`**: Thin wrappers invoking runner and querying store.
 
 ## Feature Log & Reasoning
 ### Phase 1: Module Skeletons
-- **Feature**: Initializing packages with strict separation of concerns.
-- **Reasoning**: Ensures the non-negotiable architectural rule is maintained from day one. By separating the API/Store from the Stats engine, the statistics logic remains pure, lightweight, and easily testable without needing a database connection or HTTP server.
+- **Feature**: Initialized package layout and module skeletons.
+- **Reasoning**: Enforces strict boundary separation from day one. Keeps domain logic independent from infrastructure.
 
 ### Phase 2: Statistics Engine
-- **Feature**: Developed pure statistical functions (bootstrap CI, permutation test, noise floor, etc.) and their calibration tests.
-- **Reasoning**: To distinguish meaningful drift from natural variability, the stats functions were kept functionally pure and injected with a random generator to allow full reproducibility and calibration testing on simulated distributions.
+- **Feature**: Pure statistical functions (`bootstrap_ci`, `permutation_test`, `naive_mannwhitney_comparator`, `equivalence_check`, `noise_floor`, `holm_correction`, `benjamini_hochberg`, `simulate_power`) and calibration tests.
+- **Reasoning**: Ensures all statistical evaluation is cluster-aware (clustered by prompt), reproducible, and calibrated to avoid false positives.
 
 ### Phase 3: Model Adapters
-- **Feature**: Created `ModelAdapter` base class and implemented `MockAdapter` and `OllamaAdapter`.
-- **Reasoning**: Using the Adapter pattern isolates the runner and stats pipeline from specific model backends. `MockAdapter` supports robust E2E testing without GPUs, keeping CI/CD pipelines fast and deterministic. `requests` was added to `pyproject.toml` to interface with the Ollama local API.
+- **Feature**: `ModelAdapter` base class, `OllamaAdapter`, and distribution-sampling `MockAdapter`.
+- **Reasoning**: Enables deterministic, GPU-less end-to-end testing and CI/CD while isolating external LLM HTTP APIs.
 
-### Phase 2: Statistics Engine
-- **Feature**: Developed pure statistical functions (bootstrap CI, permutation test, noise floor, etc.) and their calibration tests.
-- **Reasoning**: To distinguish meaningful drift from natural variability, the stats functions were kept functionally pure and injected with a random generator to allow full reproducibility and calibration testing on simulated distributions.
-
-### Phase 3: Model Adapters
-- **Feature**: Created `ModelAdapter` base class and implemented `MockAdapter` and `OllamaAdapter`.
-- **Reasoning**: Using the Adapter pattern isolates the runner and stats pipeline from specific model backends. `MockAdapter` supports robust E2E testing without GPUs, keeping CI/CD pipelines fast and deterministic. `requests` was added to `pyproject.toml` to interface with the Ollama local API.
+### Phase 4: Database Schemas and JSONL Persistence
+- **Feature**: SQLAlchemy ORM models (`Experiment`, `ModelSnapshot`, `DatasetVersion`, `Task`, `Run`, `Observation`, `MetricResult`, `PromptAggregate`, `StatisticalTest`, `RiskPolicy`, `DriftResult`) and append-only JSONL logging.
+- **Reasoning**: Per specification, the database is derived; the append-only JSONL file is the immutable source of truth for all raw observations. SQLite provides local, zero-config relational queries without operational overhead.
