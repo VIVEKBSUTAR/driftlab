@@ -27,10 +27,20 @@ from driftlab.store import (
     PromptAggregate,
 )
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(
     title="DriftLab API",
     description="Statistical framework for behavioral drift detection in local LLMs.",
     version="0.1.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 DEFAULT_DB_URL = "sqlite:///driftlab.db"

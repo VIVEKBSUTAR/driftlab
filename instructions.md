@@ -78,6 +78,29 @@ uvicorn driftlab.api.main:app --reload --port 8000
   ```bash
   curl http://localhost:8000/
   ```
+
+---
+
+### Running the Frontend Dashboard
+
+The frontend is a modern React + TypeScript + Vite application located in `frontend/`.
+
+#### 1. Install Frontend Dependencies
+```bash
+cd frontend
+npm install
+```
+
+#### 2. Start the Vite Dev Server
+```bash
+npm run dev
+```
+The dashboard will be accessible at `http://localhost:5173`. It connects automatically to the FastAPI backend running on port 8000.
+
+#### 3. Build for Production
+```bash
+npm run build
+```
 - **Trigger a Benchmark Run**:
   ```bash
   curl -X POST http://localhost:8000/runs \
