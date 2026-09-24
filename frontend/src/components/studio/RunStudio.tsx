@@ -58,26 +58,26 @@ export const RunStudio: React.FC<RunStudioProps> = ({ onRunCreated }) => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-white tracking-tight">Benchmark Execution Studio</h1>
-        <p className="text-xs text-slate-400 mt-1">
+    <div className="max-w-4xl mx-auto space-y-5">
+      <div className="pb-3 border-b border-border-subtle">
+        <h1 className="text-xl font-bold font-sans text-slate-100 tracking-tight">Benchmark Execution Studio</h1>
+        <p className="text-xs text-slate-400 mt-0.5 font-sans">
           Configure and execute prompt benchmark sweeps across local model adapters. Observations are logged immediately to append-only JSONL files.
         </p>
       </div>
 
       {successRunId && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+        <div className="p-3.5 rounded-[4px] bg-telemetry-emerald/10 border border-telemetry-emerald/30 text-telemetry-emerald flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="w-4 h-4 text-telemetry-emerald shrink-0" />
             <div>
-              <span className="font-bold text-sm block">Run Triggered & Logged Successfully!</span>
-              <span className="text-xs font-mono text-emerald-400/80">Run ID: {successRunId}</span>
+              <span className="font-semibold text-xs font-mono block">Run Triggered & Logged Successfully!</span>
+              <span className="text-[11px] font-mono text-telemetry-emeraldLight">Run ID: {successRunId}</span>
             </div>
           </div>
           <button
             onClick={() => onRunCreated(successRunId)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-black text-xs font-bold rounded-lg transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1 bg-telemetry-emerald hover:bg-telemetry-emeraldLight text-surface-lowest text-xs font-mono font-semibold rounded-[3px] transition-colors cursor-pointer"
           >
             <span>Analyze Drift</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -86,96 +86,96 @@ export const RunStudio: React.FC<RunStudioProps> = ({ onRunCreated }) => {
       )}
 
       {errorMsg && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 flex items-center space-x-3 text-xs">
-          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+        <div className="p-3.5 rounded-[4px] bg-telemetry-rose/10 border border-telemetry-rose/30 text-telemetry-roseLight flex items-center gap-2.5 text-xs font-mono">
+          <AlertCircle className="w-4 h-4 text-telemetry-rose shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-surface-card border border-surface-border rounded-xl p-6 space-y-6 shadow-xl shadow-black/20">
+      <form onSubmit={handleSubmit} className="bg-surface-low border border-border-subtle rounded-[4px] p-5 space-y-5">
         {/* Model and Run Type */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-mono font-medium text-slate-400 uppercase mb-2">
+            <label className="block text-[11px] font-mono font-semibold text-slate-400 uppercase mb-2">
               Model Adapter Backend
             </label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setModel('mock')}
-                className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                className={`p-2.5 rounded-[3px] border text-left transition-colors cursor-pointer ${
                   model === 'mock'
-                    ? 'bg-brand-500/15 border-brand-500 text-white shadow-sm'
-                    : 'bg-surface-base border-surface-border text-slate-400 hover:border-slate-700'
+                    ? 'bg-telemetry-emerald/10 border-telemetry-emerald text-slate-100'
+                    : 'bg-surface-lowest border-border-subtle text-slate-400 hover:border-slate-700'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-bold text-xs font-mono">Mock Adapter</span>
-                  <Sparkles className="w-3.5 h-3.5 text-brand-400" />
+                  <Sparkles className="w-3 h-3 text-telemetry-emerald" />
                 </div>
-                <p className="text-[11px] text-slate-500">Distribution sampler (No GPU needed)</p>
+                <p className="text-[10px] text-slate-500 font-sans">Distribution sampler (No GPU needed)</p>
               </button>
 
               <button
                 type="button"
                 onClick={() => setModel('llama3:8b')}
-                className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                className={`p-2.5 rounded-[3px] border text-left transition-colors cursor-pointer ${
                   model !== 'mock'
-                    ? 'bg-brand-500/15 border-brand-500 text-white shadow-sm'
-                    : 'bg-surface-base border-surface-border text-slate-400 hover:border-slate-700'
+                    ? 'bg-telemetry-emerald/10 border-telemetry-emerald text-slate-100'
+                    : 'bg-surface-lowest border-border-subtle text-slate-400 hover:border-slate-700'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-bold text-xs font-mono">Ollama Local</span>
-                  <Cpu className="w-3.5 h-3.5 text-brand-400" />
+                  <Cpu className="w-3 h-3 text-telemetry-emerald" />
                 </div>
-                <p className="text-[11px] text-slate-500">llama3:8b via localhost:11434</p>
+                <p className="text-[10px] text-slate-500 font-sans">llama3:8b via localhost:11434</p>
               </button>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-mono font-medium text-slate-400 uppercase mb-2">
+            <label className="block text-[11px] font-mono font-semibold text-slate-400 uppercase mb-2">
               Run Role & Classification
             </label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setRunType('baseline')}
-                className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                className={`p-2.5 rounded-[3px] border text-left transition-colors cursor-pointer ${
                   runType === 'baseline'
-                    ? 'bg-blue-500/15 border-blue-500 text-white shadow-sm'
-                    : 'bg-surface-base border-surface-border text-slate-400 hover:border-slate-700'
+                    ? 'bg-telemetry-indigo/15 border-telemetry-indigo text-slate-100'
+                    : 'bg-surface-lowest border-border-subtle text-slate-400 hover:border-slate-700'
                 }`}
               >
                 <span className="font-bold text-xs font-mono block">Baseline (Control)</span>
-                <p className="text-[11px] text-slate-500 mt-1">Reference benchmark state</p>
+                <p className="text-[10px] text-slate-500 font-sans mt-0.5">Reference benchmark state</p>
               </button>
 
               <button
                 type="button"
                 onClick={() => setRunType('candidate')}
-                className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                className={`p-2.5 rounded-[3px] border text-left transition-colors cursor-pointer ${
                   runType === 'candidate'
-                    ? 'bg-purple-500/15 border-purple-500 text-white shadow-sm'
-                    : 'bg-surface-base border-surface-border text-slate-400 hover:border-slate-700'
+                    ? 'bg-telemetry-violet/15 border-telemetry-violet text-slate-100'
+                    : 'bg-surface-lowest border-border-subtle text-slate-400 hover:border-slate-700'
                 }`}
               >
                 <span className="font-bold text-xs font-mono block">Candidate (Treatment)</span>
-                <p className="text-[11px] text-slate-500 mt-1">Updated weights or prompt state</p>
+                <p className="text-[10px] text-slate-500 font-sans mt-0.5">Updated weights or prompt state</p>
               </button>
             </div>
           </div>
         </div>
 
         {/* Repetitions per prompt */}
-        <div className="pt-4 border-t border-surface-border">
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-mono font-medium text-slate-400 uppercase flex items-center gap-1.5">
-              <Sliders className="w-3.5 h-3.5 text-brand-400" />
-              Repeats per Prompt ($k$): <span className="text-white font-bold font-mono">{repeats} repeats</span>
+        <div className="pt-3 border-t border-border-subtle">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-[11px] font-mono font-semibold text-slate-400 uppercase flex items-center gap-1.5">
+              <Sliders className="w-3.5 h-3.5 text-telemetry-emerald" />
+              Repeats per Prompt ($k$): <span className="text-slate-100 font-bold font-mono">{repeats} repeats</span>
             </label>
-            <span className="text-[11px] text-slate-500 font-mono">Within-prompt noise estimation</span>
+            <span className="text-[10px] text-slate-500 font-mono">Within-prompt noise estimation</span>
           </div>
           <input
             type="range"
@@ -184,7 +184,7 @@ export const RunStudio: React.FC<RunStudioProps> = ({ onRunCreated }) => {
             step="1"
             value={repeats}
             onChange={(e) => setRepeats(parseInt(e.target.value, 10))}
-            className="w-full h-2 bg-surface-elevated rounded-lg appearance-none cursor-pointer accent-brand-500"
+            className="w-full accent-telemetry-emerald cursor-pointer"
           />
           <div className="flex justify-between text-[10px] font-mono text-slate-500 mt-1">
             <span>2 (Fast)</span>
@@ -195,32 +195,32 @@ export const RunStudio: React.FC<RunStudioProps> = ({ onRunCreated }) => {
         </div>
 
         {/* Evaluation Metrics Checklist */}
-        <div className="pt-4 border-t border-surface-border">
-          <label className="block text-xs font-mono font-medium text-slate-400 uppercase mb-3">
+        <div className="pt-3 border-t border-border-subtle">
+          <label className="block text-[11px] font-mono font-semibold text-slate-400 uppercase mb-2">
             Evaluation Metrics to Compute
           </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {availableMetrics.map((m) => {
               const active = selectedMetrics.includes(m.id);
               return (
                 <div
                   key={m.id}
                   onClick={() => toggleMetric(m.id)}
-                  className={`p-3 rounded-lg border flex items-start space-x-3 cursor-pointer transition-all ${
+                  className={`p-2.5 rounded-[3px] border flex items-start gap-2.5 cursor-pointer transition-colors ${
                     active
-                      ? 'bg-brand-500/10 border-brand-500/40 text-slate-200'
-                      : 'bg-surface-base border-surface-border text-slate-500 hover:border-slate-700'
+                      ? 'bg-telemetry-emerald/10 border-telemetry-emerald/40 text-slate-200'
+                      : 'bg-surface-lowest border-border-subtle text-slate-500 hover:border-slate-700'
                   }`}
                 >
                   <input
                     type="checkbox"
                     checked={active}
                     onChange={() => {}}
-                    className="mt-0.5 rounded border-slate-700 text-brand-600 focus:ring-brand-500"
+                    className="mt-0.5 rounded-[2px] border-slate-700 text-telemetry-emerald focus:ring-0"
                   />
                   <div>
-                    <span className="text-xs font-mono font-bold text-white block">{m.name}</span>
-                    <span className="text-[11px] text-slate-400 leading-tight block mt-0.5">{m.desc}</span>
+                    <span className="text-xs font-mono font-semibold text-slate-200 block">{m.name}</span>
+                    <span className="text-[10px] text-slate-400 font-sans block mt-0.5">{m.desc}</span>
                   </div>
                 </div>
               );
@@ -229,17 +229,14 @@ export const RunStudio: React.FC<RunStudioProps> = ({ onRunCreated }) => {
         </div>
 
         {/* Action Button */}
-        <div className="pt-5 border-t border-surface-border flex items-center justify-end">
+        <div className="pt-4 border-t border-border-subtle flex items-center justify-end">
           <button
             type="submit"
             disabled={loading}
-            className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-sm font-semibold rounded-lg shadow-lg shadow-brand-500/25 disabled:opacity-50 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-5 py-2 bg-telemetry-emerald hover:bg-telemetry-emeraldLight text-surface-lowest text-xs font-mono font-semibold rounded-[4px] shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
           >
             {loading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Running Benchmark...</span>
-              </>
+              <span>Running Benchmark Sweep...</span>
             ) : (
               <>
                 <PlayCircle className="w-4 h-4" />

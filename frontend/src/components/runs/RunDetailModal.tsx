@@ -30,55 +30,55 @@ export const RunDetailModal: React.FC<RunDetailModalProps> = ({ runId, onClose }
   if (!runId) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="bg-surface-card border border-surface-border rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div className="bg-surface-low border border-border-subtle rounded-[4px] w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
         {/* Modal Header */}
-        <div className="p-5 border-b border-surface-border flex items-center justify-between bg-surface-elevated/40">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-lg bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-400">
-              <Layers className="w-5 h-5" />
+        <div className="p-4 border-b border-border-subtle flex items-center justify-between bg-surface-high/30">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-[3px] bg-telemetry-emerald/10 border border-telemetry-emerald/30 flex items-center justify-center text-telemetry-emerald">
+              <Layers className="w-4 h-4" />
             </div>
             <div>
-              <div className="flex items-center space-x-2">
-                <h3 className="text-base font-bold font-mono text-white">{runId}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold font-mono text-slate-100">{runId}</h3>
                 {detail && (
                   <span
-                    className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded border ${
+                    className={`text-[10px] font-mono font-bold uppercase px-1.5 py-0.2 rounded-[2px] border ${
                       detail.run_type === 'baseline'
-                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                        : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                        ? 'bg-telemetry-indigo/15 text-telemetry-indigoLight border-telemetry-indigo/30'
+                        : 'bg-telemetry-violet/15 text-telemetry-violetLight border-telemetry-violet/30'
                     }`}
                   >
                     {detail.run_type}
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400 font-mono mt-0.5">Run Snapshot & Prompt Aggregates</p>
+              <p className="text-[11px] text-slate-400 font-mono mt-0.5">Run Snapshot & Prompt Aggregates</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-surface-hover transition-colors"
+            className="p-1 text-slate-400 hover:text-white rounded-[3px] hover:bg-surface-high transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-5">
+        <div className="p-5 overflow-y-auto space-y-4">
           {loading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-40 w-full" />
+            <div className="space-y-2.5">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-32 w-full" />
             </div>
           ) : detail ? (
             <>
               {/* Metadata Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-                <div className="p-3 bg-surface-base rounded-lg border border-surface-border">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs font-mono">
+                <div className="p-2.5 bg-surface-lowest rounded-[3px] border border-border-subtle">
                   <span className="text-slate-500 block mb-1 text-[10px] uppercase flex items-center gap-1">
-                    <Cpu className="w-3 h-3 text-brand-400" /> Model Identifier
+                    <Cpu className="w-3 h-3 text-telemetry-emerald" /> Model Identifier
                   </span>
                   <span className="text-slate-200 font-semibold">{detail.model.identifier || 'N/A'}</span>
                   <span className="text-[10px] text-slate-500 block truncate mt-1">
@@ -86,12 +86,12 @@ export const RunDetailModal: React.FC<RunDetailModalProps> = ({ runId, onClose }
                   </span>
                 </div>
 
-                <div className="p-3 bg-surface-base rounded-lg border border-surface-border">
+                <div className="p-2.5 bg-surface-lowest rounded-[3px] border border-border-subtle">
                   <span className="text-slate-500 block mb-1 text-[10px] uppercase flex items-center gap-1">
-                    <FileText className="w-3 h-3 text-emerald-400" /> Source of Truth
+                    <FileText className="w-3 h-3 text-telemetry-emerald" /> Source of Truth
                   </span>
                   <span className="text-slate-200 truncate block font-mono text-[11px]">{detail.jsonl_path || 'N/A'}</span>
-                  <span className="text-[10px] text-emerald-400 block mt-1">
+                  <span className="text-[10px] text-telemetry-emerald block mt-1">
                     {detail.observations_count} Observations Recorded
                   </span>
                 </div>
@@ -100,13 +100,13 @@ export const RunDetailModal: React.FC<RunDetailModalProps> = ({ runId, onClose }
               {/* Prompt Aggregates Table */}
               <div>
                 <h4 className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Database className="w-3.5 h-3.5 text-brand-400" />
+                  <Database className="w-3.5 h-3.5 text-telemetry-emerald" />
                   Prompt-Level Aggregates (Repeats Clustered)
                 </h4>
                 {detail.aggregates && detail.aggregates.length > 0 ? (
-                  <div className="overflow-x-auto rounded-lg border border-surface-border">
+                  <div className="overflow-x-auto rounded-[3px] border border-border-subtle">
                     <table className="w-full text-xs font-mono text-left">
-                      <thead className="bg-surface-elevated/60 text-slate-400 border-b border-surface-border text-[11px]">
+                      <thead className="bg-surface-high/50 text-slate-400 border-b border-border-subtle text-[10px] uppercase font-semibold">
                         <tr>
                           <th className="px-3 py-2">Task ID</th>
                           <th className="px-3 py-2">Metric</th>
@@ -115,12 +115,12 @@ export const RunDetailModal: React.FC<RunDetailModalProps> = ({ runId, onClose }
                           <th className="px-3 py-2 text-right">Repeats</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-surface-border bg-surface-base/60">
+                      <tbody className="divide-y divide-border-subtle bg-surface-lowest">
                         {detail.aggregates.map((agg, idx) => (
-                          <tr key={idx} className="hover:bg-surface-hover/50">
+                          <tr key={idx} className="hover:bg-surface-high/20">
                             <td className="px-3 py-2 text-slate-300 font-semibold">{agg.task_id}</td>
-                            <td className="px-3 py-2 text-brand-400">{agg.metric_name}</td>
-                            <td className="px-3 py-2 text-white font-bold">{agg.mean_value.toFixed(4)}</td>
+                            <td className="px-3 py-2 text-telemetry-emerald">{agg.metric_name}</td>
+                            <td className="px-3 py-2 text-slate-100 font-bold">{agg.mean_value.toFixed(4)}</td>
                             <td className="px-3 py-2 text-slate-400">{agg.std_value !== null ? agg.std_value.toFixed(4) : '0.0000'}</td>
                             <td className="px-3 py-2 text-right text-slate-400">{agg.repeats_count}</td>
                           </tr>
@@ -134,15 +134,15 @@ export const RunDetailModal: React.FC<RunDetailModalProps> = ({ runId, onClose }
               </div>
             </>
           ) : (
-            <p className="text-xs text-rose-400">Failed to load run details.</p>
+            <p className="text-xs text-telemetry-rose">Failed to load run details.</p>
           )}
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-surface-border bg-surface-elevated/30 flex justify-end">
+        <div className="p-3 border-t border-border-subtle bg-surface-high/20 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-surface-elevated hover:bg-surface-hover text-slate-300 text-xs font-semibold rounded-lg border border-surface-border transition-colors cursor-pointer"
+            className="px-3.5 py-1 bg-surface-high hover:bg-surface-highest text-slate-300 text-xs font-mono font-semibold rounded-[3px] border border-border-subtle transition-colors cursor-pointer"
           >
             Close
           </button>

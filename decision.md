@@ -75,3 +75,13 @@ DriftLab is a statistical framework for behavioral drift detection and validatio
 ### Phase 8: Interactive Frontend Dashboard
 - **Feature**: React, TypeScript, Vite, and Tailwind CSS SPA with visual confidence interval and equivalence corridor plots, run explorer, benchmark studio, and risk tier inspectors.
 - **Reasoning**: Gives AI engineers an intuitive visual tool to inspect complex statistical metrics (BCa bootstrap CI, permutation p-values, equivalence margins) without reading raw terminal numbers. Connected directly via REST API with complete fallback resilience.
+
+### Phase 9: Enterprise Obsidian Telemetry Redesign via Stitch MCP
+- **Feature**: Complete frontend redesign using Stitch MCP server (`Obsidian Telemetry` design system). Replaced rounded generic cards and neon gradients with high-density, technical, disciplined layout:
+  - Deep obsidian base surfaces (`#0a0e16` / `#0f131c`), 1px borders (`#1e293b`), and surgical status accents (Emerald `#10b981`, Indigo `#6366f1`, Violet `#a855f7`).
+  - Strict typographic system using `Geist` for headers and `JetBrains Mono` for all numbers, tables, p-values, CI intervals, and model hashes. Tabular figure alignment enforced (`font-variant-numeric: tabular-nums`).
+  - High-precision Forest Plot (`IntervalChart.tsx`) displaying equivalence corridors $[-\delta, +\delta]$, noise floor bands $[-\sigma_0, +\sigma_0]$, zero drift reference, and empirical 95% BCa Bootstrap CI brackets.
+  - New **Prompt Divergence & Output Diff Explorer** (`PromptDiffExplorer.tsx`): side-by-side completion inspection (Baseline FP16 vs Candidate Quantized) with token-level diff highlights and AST validation summaries.
+  - Fixed `pyproject.toml` console script entrypoint so `driftlab` CLI binary installs automatically in `venv/bin/driftlab`.
+- **Reasoning**: Addresses the "AI-generated" look by elevating the interface to an authentic, high-density scientific observability tool comparable to Weights & Biases, Sentry, and Linear.
+

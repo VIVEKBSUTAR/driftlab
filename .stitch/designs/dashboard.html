@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DriftLab - Statistical LLM Drift & Behavioral Validation</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=JetBrains+Mono:wght@100..900&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "outline": "#86948a",
+            "on-tertiary": "#490080",
+            "primary-fixed-dim": "#4edea3",
+            "error-container": "#93000a",
+            "on-secondary-container": "#b0b2ff",
+            "surface": "#0f131c",
+            "on-secondary-fixed-variant": "#2f2ebe",
+            "secondary-fixed-dim": "#c0c1ff",
+            "surface-dim": "#0f131c",
+            "on-surface": "#dfe2ee",
+            "tertiary-fixed": "#f0dbff",
+            "surface-container-lowest": "#0a0e16",
+            "primary-container": "#10b981",
+            "tertiary": "#ddb7ff",
+            "tertiary-container": "#c487ff",
+            "on-tertiary-fixed": "#2c0051",
+            "surface-container-high": "#262a33",
+            "on-primary-fixed-variant": "#005236",
+            "on-primary-fixed": "#002113",
+            "secondary": "#c0c1ff",
+            "on-tertiary-fixed-variant": "#6900b3",
+            "tertiary-fixed-dim": "#ddb7ff",
+            "on-tertiary-container": "#550093",
+            "on-primary-container": "#00422b",
+            "on-surface-variant": "#bbcabf",
+            "surface-tint": "#4edea3",
+            "secondary-fixed": "#e1e0ff",
+            "surface-variant": "#31353e",
+            "on-error-container": "#ffdad6",
+            "surface-bright": "#353942",
+            "error": "#ffb4ab",
+            "on-secondary-fixed": "#07006c",
+            "inverse-primary": "#006c49",
+            "primary": "#4edea3",
+            "surface-container-highest": "#31353e",
+            "inverse-on-surface": "#2c3039",
+            "on-background": "#dfe2ee",
+            "outline-variant": "#3c4a42",
+            "surface-container": "#1c2028",
+            "secondary-container": "#3131c0",
+            "on-error": "#690005",
+            "primary-fixed": "#6ffbbe",
+            "on-primary": "#003824",
+            "background": "#0f131c",
+            "inverse-surface": "#dfe2ee",
+            "surface-container-low": "#181c24",
+            "on-secondary": "#1000a9"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "margin": "1.5rem",
+            "gutter": "1rem",
+            "space-md": "0.75rem",
+            "space-xl": "2rem",
+            "space-xs": "0.25rem",
+            "space-sm": "0.5rem",
+            "space-lg": "1.25rem",
+            "margin-mobile": "1rem",
+            "gutter-compact": "0.5rem"
+          },
+          "fontFamily": {
+            "label-sm": ["JetBrains Mono"],
+            "headline-lg": ["Geist"],
+            "metric-display": ["JetBrains Mono"],
+            "body-sm": ["Geist"],
+            "headline-xl": ["Geist"],
+            "label-lg": ["JetBrains Mono"],
+            "body-lg": ["Geist"],
+            "headline-md": ["Geist"],
+            "body-md": ["Geist"],
+            "label-md": ["JetBrains Mono"],
+            "headline-xl-mobile": ["Geist"]
+          },
+          "fontSize": {
+            "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "500" }],
+            "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.015em", "fontWeight": "600" }],
+            "metric-display": ["28px", { "lineHeight": "32px", "letterSpacing": "-0.03em", "fontWeight": "600" }],
+            "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }],
+            "headline-xl": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+            "label-lg": ["13px", { "lineHeight": "18px", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+            "body-lg": ["15px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "headline-md": ["18px", { "lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+            "body-md": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "label-md": ["11px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+            "headline-xl-mobile": ["26px", { "lineHeight": "34px", "letterSpacing": "-0.015em", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      font-size: 16px;
+      line-height: 1;
+      display: inline-block;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface antialiased font-body-md text-body-md min-h-screen flex flex-col selection:bg-primary selection:text-on-primary-fixed">
+<!-- TOP APP BAR -->
+<header class="flex justify-between items-center w-full px-margin h-14 border-b border-outline-variant bg-surface-container-lowest sticky top-0 z-50">
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[20px]" data-icon="difference">difference</span>
+<span class="text-headline-md font-headline-md font-bold tracking-tight text-on-surface">DriftLab</span>
+</div>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-primary font-label-sm text-label-sm border border-outline-variant">v0.8.4-alpha</span>
+<div class="h-4 w-[1px] bg-outline-variant mx-1 hidden sm:block"></div>
+<div class="hidden sm:flex items-center gap-1.5 font-label-md text-label-md text-on-surface-variant">
+<span>Benchmarks</span>
+<span class="text-outline">/</span>
+<span class="text-on-surface font-label-md">llama-3-8b-instruct-drift</span>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<nav class="hidden md:flex items-center gap-space-lg h-full">
+<a class="text-primary border-b-2 border-primary font-label-md text-label-md py-4 transition-colors" href="#">Runs</a>
+<a class="text-on-surface-variant hover:text-on-surface font-label-md text-label-md py-4 transition-colors" href="#">Models</a>
+<a class="text-on-surface-variant hover:text-on-surface font-label-md text-label-md py-4 transition-colors" href="#">Corridors</a>
+<a class="text-on-surface-variant hover:text-on-surface font-label-md text-label-md py-4 transition-colors" href="#">Telemetry</a>
+</nav>
+<!-- Trailing Actions & Cluster -->
+<div class="flex items-center gap-space-md">
+<!-- Status Pills -->
+<div class="hidden lg:flex items-center gap-space-sm font-label-sm text-label-sm">
+<div class="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-container border border-outline-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+<span class="text-on-surface-variant">Ollama:</span>
+<span class="text-primary">Connected</span>
+</div>
+<div class="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-container border border-outline-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+<span class="text-on-surface-variant">DB:</span>
+<span class="text-on-surface">In Sync</span>
+</div>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<button class="p-1.5 rounded hover:bg-surface-container-high hover:text-on-surface transition-colors" title="CLI Terminal">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+</button>
+<button class="p-1.5 rounded hover:bg-surface-container-high hover:text-on-surface transition-colors" title="Telemetry Database">
+<span class="material-symbols-outlined" data-icon="database">database</span>
+</button>
+<button class="p-1.5 rounded hover:bg-surface-container-high hover:text-on-surface transition-colors" title="Documentation & Help">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+</div>
+<button class="px-space-md py-1.5 rounded bg-primary text-on-primary-fixed font-label-md text-label-md hover:bg-primary-fixed-dim transition-colors active:scale-[0.98] font-semibold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px]" data-icon="tune">tune</span>
+<span>Run Benchmark</span>
+</button>
+<div class="w-7 h-7 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center font-label-sm text-label-sm font-bold text-primary" title="Lead Systems Architect profile avatar">
+        SA
+      </div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- SIDE NAV BAR (ANCHOR COMPONENT) -->
+<aside class="w-64 border-r border-outline-variant bg-surface-container-low flex flex-col justify-between p-margin hidden md:flex shrink-0">
+<div class="flex flex-col gap-space-lg">
+<!-- Engine Status Header -->
+<div class="p-space-sm rounded bg-surface-container border border-outline-variant flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[18px] mt-0.5" data-icon="analytics">analytics</span>
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md font-semibold text-on-surface leading-snug">DriftLab Engine</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">daemon: active | ollama 0.3.12</span>
+</div>
+</div>
+<!-- Primary Navigation Links -->
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-space-sm px-space-md py-space-sm text-on-surface-variant hover:text-on-surface font-label-md text-label-md rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px]" data-icon="analytics">analytics</span>
+<span>Drift Matrix</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm bg-primary-container/10 text-primary border-l-2 border-primary font-label-md text-label-md rounded-r-lg" href="#">
+<span class="material-symbols-outlined text-[16px]" data-icon="tune">tune</span>
+<span>Equivalence Corridor</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm text-on-surface-variant hover:text-on-surface font-label-md text-label-md rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px]" data-icon="difference">difference</span>
+<span>Sample Inspector</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm text-on-surface-variant hover:text-on-surface font-label-md text-label-md rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px]" data-icon="grain">grain</span>
+<span>Noise Baseline</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm text-on-surface-variant hover:text-on-surface font-label-md text-label-md rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px]" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Side Nav Footer Links & CTA -->
+<div class="flex flex-col gap-space-md border-t border-outline-variant pt-space-md">
+<button class="w-full py-2 rounded bg-surface-container-high hover:bg-surface-container-highest text-on-surface border border-outline-variant font-label-md text-label-md transition-colors flex items-center justify-center gap-1.5">
+<span class="material-symbols-outlined text-[15px]" data-icon="analytics">analytics</span>
+<span>New Evaluation Matrix</span>
+</button>
+<div class="flex flex-col gap-0.5">
+<a class="flex items-center gap-space-sm px-space-md py-1.5 text-on-surface-variant hover:text-on-surface font-label-md text-label-md rounded transition-colors" href="#">
+<span class="material-symbols-outlined text-[15px]" data-icon="description">description</span>
+<span>Docs</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-1.5 text-on-surface-variant hover:text-on-surface font-label-md text-label-md rounded transition-colors" href="#">
+<span class="material-symbols-outlined text-[15px]" data-icon="key">key</span>
+<span>API Keys</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- MAIN SCROLLABLE CONTENT CANVAS -->
+<main class="flex-1 overflow-y-auto bg-surface-container-lowest p-space-lg lg:p-margin flex flex-col gap-space-lg">
+<!-- SUB-HEADER / RUN CONTROLS -->
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-space-md pb-space-sm border-b border-outline-variant">
+<div>
+<div class="flex items-center gap-2">
+<h1 class="text-headline-lg font-headline-lg text-on-surface font-bold tracking-tight">Equivalence Verification & Behavioral Corridor</h1>
+<span class="px-2 py-0.5 rounded bg-primary/10 border border-primary/30 text-primary font-label-sm text-label-sm">RUN #BR-20241019-09</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-0.5">Statistical verification of behavioral equivalence under quant compression using Two One-Sided Tests (TOST).</p>
+</div>
+<!-- Risk Policy Filter Selector -->
+<div class="flex items-center gap-2 bg-surface-container-low border border-outline-variant px-3 py-1.5 rounded">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Policy:</span>
+<span class="font-label-md text-label-md text-primary font-semibold">Medium Tier (Margin δ=±0.05, α=0.05)</span>
+<span class="material-symbols-outlined text-outline text-[16px]" data-icon="tune">tune</span>
+</div>
+</div>
+<!-- SECTION 2: COMPARISON HEADER -->
+<section class="grid grid-cols-1 lg:grid-cols-11 gap-space-md items-center">
+<!-- Baseline Model Card -->
+<div class="lg:col-span-5 bg-surface-container-low border border-outline-variant rounded p-space-md relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-secondary-container"></div>
+<div class="flex justify-between items-start mb-2 pl-2">
+<div class="flex items-center gap-1.5">
+<span class="px-1.5 py-0.5 rounded bg-secondary-container/20 text-secondary border border-secondary/30 font-label-sm text-label-sm uppercase font-semibold">Baseline Model</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">sha256:8f2a...c4e1</span>
+</div>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container text-on-surface border border-outline-variant font-mono">~42ms/tok</span>
+</div>
+<div class="pl-2">
+<h2 class="text-headline-md font-headline-md font-semibold text-on-surface">Meta-Llama-3-8B-Instruct (FP16 Baseline)</h2>
+<div class="flex items-center gap-3 mt-2 font-label-sm text-label-sm text-on-surface-variant font-mono">
+<span class="flex items-center gap-1"><span class="text-outline">Runs:</span> 100 prompts × 3 repeats</span>
+<span>•</span>
+<span class="flex items-center gap-1"><span class="text-outline">Temp:</span> 0.2</span>
+<span>•</span>
+<span class="flex items-center gap-1"><span class="text-outline">VRAM:</span> 16.0 GB</span>
+</div>
+</div>
+</div>
+<!-- Divergence Metric Badge -->
+<div class="lg:col-span-1 flex flex-col items-center justify-center py-2 lg:py-0">
+<div class="w-8 h-8 rounded-full bg-surface-container border border-outline-variant flex items-center justify-center font-label-sm text-label-sm font-bold text-outline">
+            VS
+          </div>
+<div class="mt-1 text-center">
+<span class="font-label-sm text-label-sm block text-primary font-mono font-semibold">Δ 1.4%</span>
+<span class="font-label-sm text-[9px] text-outline uppercase tracking-wider block">Negligible</span>
+</div>
+</div>
+<!-- Candidate Model Card -->
+<div class="lg:col-span-5 bg-surface-container-low border border-outline-variant rounded p-space-md relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-tertiary-container"></div>
+<div class="flex justify-between items-start mb-2 pl-2">
+<div class="flex items-center gap-1.5">
+<span class="px-1.5 py-0.5 rounded bg-tertiary-container/20 text-tertiary border border-tertiary/30 font-label-sm text-label-sm uppercase font-semibold">Candidate Model</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">sha256:d19b...882a</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-mono">VRAM: -54%</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container text-on-surface border border-outline-variant font-mono">~22ms/tok</span>
+</div>
+</div>
+<div class="pl-2">
+<h2 class="text-headline-md font-headline-md font-semibold text-on-surface">Meta-Llama-3-8B-Instruct-Q4_K_M (Quantized)</h2>
+<div class="flex items-center gap-3 mt-2 font-label-sm text-label-sm text-on-surface-variant font-mono">
+<span class="flex items-center gap-1"><span class="text-outline">Runs:</span> 100 prompts × 3 repeats</span>
+<span>•</span>
+<span class="flex items-center gap-1"><span class="text-outline">VRAM:</span> 4.8 GB</span>
+<span>•</span>
+<span class="flex items-center gap-1 text-primary"><span class="text-outline">Speedup:</span> 1.91x</span>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 3: EXECUTIVE STATISTICAL VERDICT BANNER -->
+<section class="bg-surface-container-low border border-primary/40 rounded p-space-md relative overflow-hidden">
+<div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-space-md">
+<div class="flex items-start sm:items-center gap-space-md">
+<div class="w-10 h-10 rounded bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0 text-primary">
+<span class="material-symbols-outlined text-[24px]" data-icon="difference">difference</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-md text-headline-md font-bold text-primary tracking-wide">NO MEANINGFUL DRIFT (EQUIVALENCE VERIFIED)</span>
+<span class="px-2 py-0.5 rounded bg-primary/20 text-on-primary-fixed font-label-sm text-label-sm font-semibold">TOST p = 0.0018</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface mt-1">
+                The 95% BCa Bootstrap CI <span class="font-label-md text-label-md text-primary font-mono bg-surface-container px-1 py-0.5 rounded">[-0.014, +0.021]</span> lies entirely within the pre-declared equivalence corridor <span class="font-label-md text-label-md text-on-surface-variant font-mono bg-surface-container px-1 py-0.5 rounded">[-0.050, +0.050]</span>. Natural noise floor is <span class="font-mono text-outline">σ₀ = 0.012</span>. Permutation test <span class="font-mono text-primary font-semibold">p = 0.384</span>.
+              </p>
+</div>
+</div>
+<!-- Sub-indicators Grid -->
+<div class="flex items-center gap-space-md shrink-0 border-t lg:border-t-0 lg:border-l border-outline-variant pt-2 lg:pt-0 lg:pl-space-md font-label-sm text-label-sm">
+<div class="flex flex-col">
+<span class="text-outline uppercase">Error Rate (α)</span>
+<span class="text-on-surface font-mono font-semibold">5.0%</span>
+</div>
+<div class="h-6 w-[1px] bg-outline-variant"></div>
+<div class="flex flex-col">
+<span class="text-outline uppercase">Permutations</span>
+<span class="text-on-surface font-mono font-semibold">N = 10,000</span>
+</div>
+<div class="h-6 w-[1px] bg-outline-variant"></div>
+<div class="flex flex-col">
+<span class="text-outline uppercase">Validation Method</span>
+<span class="text-primary font-mono font-semibold">TOST BCa</span>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 4: KEY STATISTICAL METRICS CARDS GRID (4 COLUMNS) -->
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<!-- Card 1: Effect Size Δ -->
+<div class="bg-surface-container-low border border-outline-variant rounded p-space-md flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Effect Size Δ</span>
+<span class="px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-label-sm text-label-sm font-mono">PASS</span>
+</div>
+<div class="my-2">
+<div class="font-metric-display text-metric-display text-primary font-mono">+0.004</div>
+<span class="text-body-sm font-body-sm text-on-surface-variant">Within margin (Limit: ±0.050)</span>
+</div>
+<!-- Micro Scale Bar -->
+<div class="w-full bg-surface-container h-1.5 rounded relative mt-1">
+<div class="absolute left-1/2 -top-1 bottom-0 w-[1px] h-3 bg-outline z-10"></div>
+<div class="absolute left-[40%] right-[40%] top-0 bottom-0 bg-primary/20 rounded"></div>
+<div class="absolute left-[52%] top-0 w-2 h-1.5 bg-primary rounded-full"></div>
+</div>
+</div>
+<!-- Card 2: Permutation p-value -->
+<div class="bg-surface-container-low border border-outline-variant rounded p-space-md flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Permutation p-value</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant border border-outline-variant font-label-sm text-label-sm font-mono">NON-SIG</span>
+</div>
+<div class="my-2">
+<div class="font-metric-display text-metric-display text-on-surface font-mono">0.384</div>
+<span class="text-body-sm font-body-sm text-on-surface-variant">Not significant (Threshold: α=0.050)</span>
+</div>
+<!-- Subtle indicator line -->
+<div class="w-full flex items-center justify-between text-[9px] font-mono text-outline pt-1 border-t border-outline-variant">
+<span>Null: No diff</span>
+<span class="text-primary">10k Shuffles</span>
+</div>
+</div>
+<!-- Card 3: Noise Floor σ₀ -->
+<div class="bg-surface-container-low border border-outline-variant rounded p-space-md flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Noise Floor σ₀</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant border border-outline-variant font-label-sm text-label-sm font-mono">BASELINE</span>
+</div>
+<div class="my-2">
+<div class="font-metric-display text-metric-display text-on-surface font-mono">0.012</div>
+<span class="text-body-sm font-body-sm text-on-surface-variant">Empirically measured via repeat trials</span>
+</div>
+<div class="w-full flex items-center justify-between text-[9px] font-mono text-outline pt-1 border-t border-outline-variant">
+<span>FP16 Self-Variance</span>
+<span>3x Temp=0.2</span>
+</div>
+</div>
+<!-- Card 4: Statistical Power -->
+<div class="bg-surface-container-low border border-outline-variant rounded p-space-md flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Statistical Power (1-β)</span>
+<span class="px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-label-sm text-label-sm font-mono">OPTIMAL</span>
+</div>
+<div class="my-2">
+<div class="font-metric-display text-metric-display text-primary font-mono">91.4%</div>
+<span class="text-body-sm font-body-sm text-on-surface-variant">Adequately powered (Target: ≥80.0%)</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded relative mt-1 overflow-hidden">
+<div class="bg-primary h-full w-[91.4%]"></div>
+</div>
+</div>
+</section>
+<!-- SECTION 5: INTERACTIVE EQUIVALENCE & CONFIDENCE INTERVAL CORRIDOR PLOT (FOREST PLOT) -->
+<section class="bg-surface-container-low border border-outline-variant rounded p-space-md flex flex-col gap-space-md">
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-space-sm pb-space-sm border-b border-outline-variant">
+<div>
+<h3 class="text-headline-md font-headline-md font-semibold text-on-surface">Equivalence Corridor & 95% BCa Confidence Intervals</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Equivalence confirmed if the 95% bootstrap confidence interval falls strictly within [-δ, +δ].</p>
+</div>
+<!-- Legend -->
+<div class="flex flex-wrap items-center gap-3 font-label-sm text-label-sm text-on-surface-variant">
+<div class="flex items-center gap-1.5">
+<span class="w-3 h-3 bg-primary/15 border border-primary/30 rounded-xs"></span>
+<span>Tolerance Corridor [-0.05, +0.05]</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-3 h-3 bg-surface-container-highest border border-outline rounded-xs"></span>
+<span>Noise Floor (±σ₀)</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span>Point Estimate (Δ)</span>
+</div>
+</div>
+</div>
+<!-- Axis Labels -->
+<div class="relative w-full h-5 font-mono text-[10px] text-outline">
+<div class="absolute left-[15%] -translate-x-1/2">-0.05 (Tolerance -δ)</div>
+<div class="absolute left-[35%] -translate-x-1/2">-0.012 (-σ₀)</div>
+<div class="absolute left-1/2 -translate-x-1/2 text-on-surface font-semibold">0.00 (Zero Drift)</div>
+<div class="absolute left-[65%] -translate-x-1/2">+0.012 (+σ₀)</div>
+<div class="absolute left-[85%] -translate-x-1/2">+0.05 (Tolerance +δ)</div>
+</div>
+<!-- Plot Container -->
+<div class="flex flex-col gap-space-md">
+<!-- Row 1: Exact Match Ratio -->
+<div class="flex flex-col md:flex-row items-start md:items-center gap-4 py-2 border-b border-outline-variant/40">
+<div class="w-48 shrink-0">
+<span class="font-label-md text-label-md font-semibold text-on-surface block">Exact Match Ratio</span>
+<span class="font-body-sm text-body-sm text-outline text-[11px]">Strict Token Identity</span>
+</div>
+<!-- Visual Corridor Bar -->
+<div class="flex-1 w-full h-8 bg-surface-container-lowest border border-outline-variant rounded relative flex items-center">
+<!-- Grid line reference -->
+<div class="absolute left-[15%] top-0 bottom-0 w-[1px] bg-primary/20 border-r border-dashed border-primary/40"></div>
+<div class="absolute left-[85%] top-0 bottom-0 w-[1px] bg-primary/20 border-r border-dashed border-primary/40"></div>
+<!-- Tolerance shaded region -->
+<div class="absolute left-[15%] right-[15%] top-0 bottom-0 bg-primary/5 pointer-events-none"></div>
+<!-- Noise floor band -->
+<div class="absolute left-[38%] right-[38%] top-0 bottom-0 bg-surface-container-high/60 pointer-events-none"></div>
+<!-- Zero line -->
+<div class="absolute left-1/2 top-0 bottom-0 w-[1px] bg-outline-variant"></div>
+<!-- CI Error Bar ([-0.021, +0.005] maps to ~35% to 53% relative to width) -->
+<div class="absolute left-[35%] w-[18%] h-[2px] bg-primary"></div>
+<div class="absolute left-[35%] top-1.5 bottom-1.5 w-[2px] bg-primary"></div>
+<div class="absolute left-[53%] top-1.5 bottom-1.5 w-[2px] bg-primary"></div>
+<!-- Point estimate dot -->
+<div class="absolute left-[44.4%] -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-primary border-2 border-surface shadow-[0_0_8px_rgba(78,222,163,0.5)]"></div>
+</div>
+<!-- Monospace Readout -->
+<div class="w-44 text-right shrink-0 font-label-md text-label-md font-mono">
+<span class="text-primary font-semibold">Δ = -0.008</span>
+<span class="text-on-surface-variant block text-[10px]">[-0.021, +0.005]</span>
+</div>
+</div>
+<!-- Row 2: Semantic Similarity (Cosine) -->
+<div class="flex flex-col md:flex-row items-start md:items-center gap-4 py-2 border-b border-outline-variant/40">
+<div class="w-48 shrink-0">
+<span class="font-label-md text-label-md font-semibold text-on-surface block">Semantic Similarity</span>
+<span class="font-body-sm text-body-sm text-outline text-[11px]">Embedding Cosine Dist</span>
+</div>
+<div class="flex-1 w-full h-8 bg-surface-container-lowest border border-outline-variant rounded relative flex items-center">
+<div class="absolute left-[15%] top-0 bottom-0 w-[1px] bg-primary/20 border-r border-dashed border-primary/40"></div>
+<div class="absolute left-[85%] top-0 bottom-0 w-[1px] bg-primary/20 border-r border-dashed border-primary/40"></div>
+<div class="absolute left-[15%] right-[15%] top-0 bottom-0 bg-primary/5 pointer-events-none"></div>
+<div class="absolute left-[38%] right-[38%] top-0 bottom-0 bg-surface-container-high/60 pointer-events-none"></div>
+<div class="absolute left-1/2 top-0 bottom-0 w-[1px] bg-outline-variant"></div>
+<!-- CI Error Bar ([-0.006, +0.010] maps to ~45% to 57%) -->
+<div class="absolute left-[45%] w-[12%] h-[2px] bg-primary"></div>
+<div class="absolute left-[45%] top-1.5 bottom-1.5 w-[2px] bg-primary"></div>
+<div class="absolute left-[57%] top-1.5 bottom-1.5 w-[2px] bg-primary"></div>
+<!-- Point estimate dot -->
+<div class="absolute left-[51.4%] -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-primary border-2 border-surface shadow-[0_0_8px_rgba(78,222,163,0.5)]"></div>
+</div>
+<div class="w-44 text-right shrink-0 font-label-md text-label-md font-mono">
+<span class="text-primary font-semibold">Δ = +0.002</span>
+<span class="text-on-surface-variant block text-[10px]">[-0.006, +0.010]</span>
+</div>
+</div>
+<!-- Row 3: JSON Schema Validity -->
+<div class="flex flex-col md:flex-row items-start md:items-center gap-4 py-2 border-b border-outline-variant/40">
+<div class="w-48 shrink-0">
+<span class="font-label-md text-label-md font-semibold text-on-surface block">JSON Schema Validity</span>
+<span class="font-body-sm text-body-sm text-outline text-[11px]">Structural AST Conformity</span>
+</div>
+<div class="flex-1 w-full h-8 bg-surface-container-lowest border border-outline-variant rounded relative flex items-center">
+<div class="absolute left-[15%] top-0 bottom-0 w-[1px] bg-primary/20 border-r border-dashed border-primary/40"></div>
+<div class="absolute left-[85%] top-0 bottom-0 w-[1px] bg-primary/20 border-r border-dashed border-primary/40"></div>
+<div class="absolute left-[15%] right-[15%] top-0 bottom-0 bg-primary/5 pointer-events-none"></div>
+<div class="absolute left-[38%] right-[38%] top-0 bottom-0 bg-surface-container-high/60 pointer-events-none"></div>
+<div class="absolute left-1/2 top-0 bottom-0 w-[1px] bg-outline-variant"></div>
+<!-- CI Error Bar (0.000, 0.000 - exact) -->
+<div class="absolute left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-primary border-2 border-surface shadow-[0_0_8px_rgba(78,222,163,0.5)]"></div>
+</div>
+<div class="w-44 text-right shrink-0 font-label-md text-label-md font-mono">
+<span class="text-on-surface font-semibold">Δ = 0.000</span>
+<span class="text-on-surface-variant block text-[10px]">[0.000, +0.000]</span>
+</div>
+</div>
+<!-- Row 4: Token Overlap (Jaccard) -->
+<div class="flex flex-col md:flex-row items-start md:items-center gap-4 py-2">
+<div class="w-48 shrink-0">
+<span class="font-label-md text-label-md font-semibold text-on-surface block">Token Overlap (Jaccard)</span>
+<span class="font-body-sm text-body-sm text-outline text-[11px]">N-gram Co-occurrence</span>
+</div>
+<div class="flex-1 w-full h-8 bg-surface-container-lowest border border-outline-variant rounded relative flex items-center">
+<div class="absolute left-[15%] top-0 bottom-0 w-[1px] bg-primary/20 border-r border-dashed border-primary/40"></div>
+<div class="absolute left-[85%] top-0 bottom-0 w-[1px] bg-primary/20 border-r border-dashed border-primary/40"></div>
+<div class="absolute left-[15%] right-[15%] top-0 bottom-0 bg-primary/5 pointer-events-none"></div>
+<div class="absolute left-[38%] right-[38%] top-0 bottom-0 bg-surface-container-high/60 pointer-events-none"></div>
+<div class="absolute left-1/2 top-0 bottom-0 w-[1px] bg-outline-variant"></div>
+<!-- CI Error Bar ([-0.032, +0.004] maps to ~27% to 53%) -->
+<div class="absolute left-[27%] w-[26%] h-[2px] bg-primary"></div>
+<div class="absolute left-[27%] top-1.5 bottom-1.5 w-[2px] bg-primary"></div>
+<div class="absolute left-[53%] top-1.5 bottom-1.5 w-[2px] bg-primary"></div>
+<!-- Point estimate dot -->
+<div class="absolute left-[40.2%] -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-primary border-2 border-surface shadow-[0_0_8px_rgba(78,222,163,0.5)]"></div>
+</div>
+<div class="w-44 text-right shrink-0 font-label-md text-label-md font-mono">
+<span class="text-primary font-semibold">Δ = -0.014</span>
+<span class="text-on-surface-variant block text-[10px]">[-0.032, +0.004]</span>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 6: PROMPT DIVERGENCE & OUTPUT DIFF EXPLORER (SPLIT PANE) -->
+<section class="bg-surface-container-low border border-outline-variant rounded p-space-md flex flex-col gap-space-md">
+<!-- Explorer Header & Filters -->
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-space-md pb-space-sm border-b border-outline-variant">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]" data-icon="difference">difference</span>
+<h3 class="text-headline-md font-headline-md font-semibold text-on-surface">Prompt Divergence & Output Inspector</h3>
+</div>
+<!-- Filter Pills -->
+<div class="flex flex-wrap items-center gap-1.5 font-label-sm text-label-sm">
+<button class="px-2.5 py-1 rounded bg-primary/10 text-primary border border-primary/30 font-medium">All Prompts (100)</button>
+<button class="px-2.5 py-1 rounded bg-surface-container text-on-surface-variant hover:text-on-surface border border-outline-variant">High Divergence (2)</button>
+<button class="px-2.5 py-1 rounded bg-surface-container text-on-surface-variant hover:text-on-surface border border-outline-variant">Format Drift (0)</button>
+<button class="px-2.5 py-1 rounded bg-surface-container text-on-surface-variant hover:text-on-surface border border-outline-variant">Syntax Errors (0)</button>
+</div>
+</div>
+<!-- Split Grid Layout -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-space-md items-start">
+<!-- Left Table (5 Cols) -->
+<div class="xl:col-span-5 border border-outline-variant rounded overflow-hidden bg-surface-container-lowest">
+<div class="px-3 py-2 border-b border-outline-variant bg-surface-container-low flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-outline uppercase font-semibold">Prompt Test Suite</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Showing 4 of 100</span>
+</div>
+<div class="divide-y divide-outline-variant">
+<!-- Row 1 (Active) -->
+<div class="p-3 bg-surface-container-high/40 border-l-2 border-primary cursor-pointer transition-colors">
+<div class="flex items-center justify-between mb-1">
+<span class="font-mono font-semibold text-primary text-label-sm">#PR-042</span>
+<span class="px-1.5 py-0.2 rounded bg-primary/15 text-primary text-[10px] font-mono">Δ 0.016</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface line-clamp-1 font-medium">Extract financial metrics from Q3 report into JSON</p>
+<div class="flex items-center justify-between mt-2 font-mono text-[10px] text-on-surface-variant">
+<span>Cosine: 0.984</span>
+<span class="text-primary flex items-center gap-0.5">Active Inspect <span class="material-symbols-outlined text-[12px]" data-icon="tune">tune</span></span>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="p-3 hover:bg-surface-container-high/20 cursor-pointer transition-colors">
+<div class="flex items-center justify-between mb-1">
+<span class="font-mono font-semibold text-on-surface text-label-sm">#PR-089</span>
+<span class="px-1.5 py-0.2 rounded bg-surface-container text-on-surface-variant text-[10px] font-mono">Δ 0.003</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-1">Synthesize multi-turn RFC dialogue into 3 bullet points</p>
+<div class="flex items-center justify-between mt-2 font-mono text-[10px] text-outline">
+<span>Cosine: 0.997</span>
+<span>Inspect Diff</span>
+</div>
+</div>
+<!-- Row 3 -->
+<div class="p-3 hover:bg-surface-container-high/20 cursor-pointer transition-colors">
+<div class="flex items-center justify-between mb-1">
+<span class="font-mono font-semibold text-on-surface text-label-sm">#PR-017</span>
+<span class="px-1.5 py-0.2 rounded bg-surface-container text-on-surface-variant text-[10px] font-mono">Δ 0.000</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-1">Generate strict TypeScript type definition for UserProfile</p>
+<div class="flex items-center justify-between mt-2 font-mono text-[10px] text-outline">
+<span>Cosine: 1.000</span>
+<span>Inspect Diff</span>
+</div>
+</div>
+<!-- Row 4 -->
+<div class="p-3 hover:bg-surface-container-high/20 cursor-pointer transition-colors">
+<div class="flex items-center justify-between mb-1">
+<span class="font-mono font-semibold text-on-surface text-label-sm">#PR-063</span>
+<span class="px-1.5 py-0.2 rounded bg-surface-container text-on-surface-variant text-[10px] font-mono">Δ 0.021</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-1">SQL query optimization for PostgreSQL temporal tables</p>
+<div class="flex items-center justify-between mt-2 font-mono text-[10px] text-outline">
+<span>Cosine: 0.979</span>
+<span>Inspect Diff</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Split Diff Pane (7 Cols) -->
+<div class="xl:col-span-7 border border-outline-variant rounded bg-surface-container-lowest overflow-hidden flex flex-col">
+<!-- Inspection Header -->
+<div class="p-space-sm bg-surface-container-low border-b border-outline-variant flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+<div>
+<div class="flex items-center gap-2">
+<span class="font-mono font-bold text-primary text-label-sm">INSPECTING #PR-042</span>
+<span class="text-outline text-label-sm">|</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Schema Valid (100%)</span>
+</div>
+<span class="text-[11px] text-outline font-mono mt-0.5 block">Cosine Sim: 0.984 • Latency: 142ms vs 88ms (-38%)</span>
+</div>
+<div class="flex items-center gap-2 font-label-sm text-label-sm">
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface border border-outline-variant font-mono">Diff: 2 tokens</span>
+</div>
+</div>
+<!-- Side-by-side Code/Text Diff Container -->
+<div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-outline-variant text-label-sm font-mono p-space-sm gap-2">
+<!-- Baseline Model Output -->
+<div class="flex flex-col gap-1 p-2 bg-surface-container-low/50 rounded">
+<div class="flex items-center justify-between pb-1 border-b border-outline-variant text-secondary font-semibold">
+<span>FP16 Baseline</span>
+<span class="text-[10px] text-outline">142ms</span>
+</div>
+<pre class="mt-2 text-on-surface-variant leading-relaxed overflow-x-auto whitespace-pre-wrap">{
+  <span class="text-secondary">"fiscal_year"</span>: <span class="text-on-surface">2024</span>,
+  <span class="text-secondary">"quarter"</span>: <span class="text-on-surface">"Q3"</span>,
+  <span class="text-secondary">"revenue_usd"</span>: <span class="text-on-surface">18400000</span>,
+  <span class="text-secondary">"operating_margin"</span>: <span class="bg-error-container/30 text-error px-1 py-0.5 rounded">0.24</span>,
+  <span class="text-secondary">"ebitda_growth_yoy"</span>: <span class="text-on-surface">0.082</span>
+}</pre>
+</div>
+<!-- Candidate Model Output -->
+<div class="flex flex-col gap-1 p-2 bg-surface-container-low/50 rounded">
+<div class="flex items-center justify-between pb-1 border-b border-outline-variant text-tertiary font-semibold">
+<span>Q4_K_M Quantized</span>
+<span class="text-[10px] text-primary">88ms (fast)</span>
+</div>
+<pre class="mt-2 text-on-surface-variant leading-relaxed overflow-x-auto whitespace-pre-wrap">{
+  <span class="text-tertiary">"fiscal_year"</span>: <span class="text-on-surface">2024</span>,
+  <span class="text-tertiary">"quarter"</span>: <span class="text-on-surface">"Q3"</span>,
+  <span class="text-tertiary">"revenue_usd"</span>: <span class="text-on-surface">18400000</span>,
+  <span class="text-tertiary">"operating_margin"</span>: <span class="bg-primary/20 text-primary px-1 py-0.5 rounded">24.0%</span>,
+  <span class="text-tertiary">"ebitda_growth_yoy"</span>: <span class="text-on-surface">0.082</span>
+}</pre>
+</div>
+</div>
+<!-- Diff Footnote & Verification Summary -->
+<div class="px-space-md py-2 bg-surface-container border-t border-outline-variant flex items-center justify-between text-[11px] text-on-surface-variant font-mono">
+<span class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[14px]" data-icon="tune">tune</span>
+<span>Semantic equivalence preserved under numerical formatting variance.</span>
+</span>
+<button class="text-primary hover:underline">Full Trace AST</button>
+</div>
+</div>
+</div>
+</section>
+</main>
+</div>
+<!-- STATUS FOOTER BAR -->
+<footer class="h-7 bg-surface-container-lowest border-t border-outline-variant px-margin flex items-center justify-between font-label-sm text-label-sm text-outline">
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span>DAEMON: RUNNING</span>
+</span>
+<span>CLUSTER: us-east-local-inference-01</span>
+<span>RUNTIME: llama.cpp b3600</span>
+</div>
+<div class="flex items-center gap-3">
+<span>TOST BCa N=10k</span>
+<span>UTF-8 ENCODED</span>
+<span class="text-on-surface">DriftLab Statistical Observability</span>
+</div>
+</footer>
+</body></html>
