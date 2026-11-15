@@ -140,3 +140,35 @@ def compute_metric(
     if reference is None:
         raise ValueError(f"Metric '{metric_name}' requires a reference string.")
     return fn(prediction, reference, **kwargs)
+
+
+def answer_match(prediction: str, reference: str, answer_type: str | None = None, **kwargs: Any) -> float:
+    """Benchmark answer extraction, with explicit task answer type.
+
+    Numeric: compare the last number (or #### answer) using Decimal; Boolean:
+    compare the first yes/no/true/false token. Unparseable responses score zero.
+    This measures benchmark answer agreement, not explanation quality.
+    """
+    from decimal import Decimal, InvalidOperation
+    if answer_type == "numeric":
+        def number(text):
+            text = text.rsplit("####", 1)[-1].replace(",", "")
+            values = re.findall(r"[-+]?\d+(?:\.\d+)?", text)
+            if not values:
+                return None
+            try:
+                return Decimal(values[-1])
+            except InvalidOperation:
+                return None
+        expected, actual = number(reference), number(prediction)
+        return float(expected is not None and actual == expected)
+    if answer_type == "boolean":
+        def boolean(text):
+            token = re.match(r"\s*(yes|no|true|false)\b", text, flags=re.I)
+            return {"yes":True,"true":True,"no":False,"false":False}.get(token.group(1).lower()) if token else None
+        expected, actual = boolean(reference), boolean(prediction)
+        return float(expected is not None and actual is not None and actual == expected)
+    return exact_match(prediction, reference)
+
+
+METRIC_REGISTRY["answer_match"] = answer_match

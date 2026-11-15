@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Reproducible, risk-aware statistical evaluation of LLM behavioral drift."
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "MIT"
 classifiers = ["Programming Language :: Python :: 3", "Topic :: Scientific/Engineering :: Artificial Intelligence"]
 dependencies = [
   "fastapi>=0.100,<1", "sqlalchemy>=2,<3", "pydantic>=2,<3",
@@ -21,7 +21,7 @@ driftlab = "driftlab.cli.main:app"
 
 [project.optional-dependencies]
 embeddings = ["sentence-transformers>=2.2,<7"]
-dev = ["pytest>=7,<10", "httpx>=0.24,<1", "build>=1,<2", "wheel>=0.40"]
+dev = ["pytest>=7,<10", "httpx>=0.24,<1", "setuptools>=77"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

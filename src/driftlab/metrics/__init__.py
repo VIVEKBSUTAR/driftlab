@@ -3,6 +3,7 @@ Evaluation metrics package for DriftLab.
 """
 
 from driftlab.metrics.functions import (
+    answer_match,
     exact_match,
     contains,
     sequence_similarity,
@@ -13,6 +14,7 @@ from driftlab.metrics.functions import (
 )
 
 __all__ = [
+    "answer_match",
     "exact_match",
     "contains",
     "sequence_similarity",

@@ -121,3 +121,41 @@ def test_api_background_and_export_share_stored_evidence(tmp_path):
 
 def test_model_digest_participates_in_identity():
     assert hash_model({"identifier":"same-tag","digest":"a"}) != hash_model({"identifier":"same-tag","digest":"b"})
+
+
+def test_official_dataset_conversion_preserves_answers():
+    from scripts.prepare_benchmarks import convert
+    math = convert("gsm8k", {"question":"What is 2+2?", "answer":"Working. #### 4"}, 7)
+    boolean = convert("boolq", {"question":"Is it true?", "passage":"It is false.", "answer":False}, 9)
+    assert math["expected_output"] == "4"
+    assert math["output_spec"]["answer_type"] == "numeric"
+    assert boolean["expected_output"] == "no"
+    assert boolean["output_spec"]["answer_type"] == "boolean"
+
+
+def test_api_and_library_share_task_defaults(tmp_path):
+    client = TestClient(app)
+    response = client.post('/api/runs', json={"tasks":[{"prompt":"2+2?","expected_output":"4"}],"db_url":f"sqlite:///{tmp_path/'defaults.db'}"})
+    assert response.status_code == 200
+    assert response.json()["observations_count"] == 5
+    invalid = client.post('/api/runs', json={"tasks":["not a task"]})
+    assert invalid.status_code == 422
+
+
+def test_custom_adapter_keeps_its_own_identity(tmp_path):
+    class CustomAdapter:
+        def describe(self):
+            return {"family":"custom", "identifier":"custom-state", "digest":"custom-digest"}
+
+        def generate(self, **kwargs):
+            return {"text":"4", "latency_ms":0}
+
+    lab = DriftLab(tmp_path)
+    try:
+        result = lab.run(adapter=CustomAdapter(), tasks=tasks(), repeats=3)
+        record = lab.get_run(result.run_id)
+        assert record["model_identifier"] == "custom-state"
+        assert record["synthetic"] is False
+        assert all(o["scores"]["exact_match"] == 1 for o in record["observations"])
+    finally:
+        lab.close()

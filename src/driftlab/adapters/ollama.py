@@ -61,11 +61,14 @@ class OllamaAdapter(ModelAdapter):
             raise ValueError(f"Model {self.model_name} not found in Ollama instance.")
             
         details = model_info.get("details", {})
+        version_response = requests.get(f"{self.base_url}/api/version", timeout=10)
+        version_response.raise_for_status()
+        backend_version = version_response.json().get("version", "unknown")
         
         return {
             "family": details.get("family", "unknown"),
             "identifier": self.model_name,
             "digest": model_info.get("digest", "unknown"),
             "quantization": details.get("quantization_level", "unknown"),
-            "backend_version": "ollama-api"
+            "backend_version": backend_version
         }

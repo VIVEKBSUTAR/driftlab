@@ -92,12 +92,21 @@ Background runs are local in-process jobs. Keep one server process running; afte
 venv/bin/python -m pytest tests/
 npm run build --prefix frontend
 python scripts/build_release.py
+python scripts/verify_release.py
 ```
 
 - [Architecture and decisions](decisions.md)
 - [Review demonstration and submission checklist](docs/SUBMISSION.md)
+- [Verification and pilot results](docs/VALIDATION.md)
+- [Selected models and datasets](docs/MODELS_AND_DATA.md)
 - [Real-model experiment protocol](docs/EXPERIMENTS.md)
 - [Python example](examples/evaluate.py)
 - [Real-model study runner](examples/local_model_study.py)
 
 The bundled 32-prompt suite is an original **functional smoke test**, not a published benchmark. Synthetic experiments establish pipeline behavior, not real-model performance or generalizability. Claims covering multiple local model families and benchmark datasets require the real-model experiments described in the study protocol.
+
+## Completed local pilot
+
+Qwen2.5 0.5B and SmolLM2 360M were tested on reproducibly sampled GSM8K and BoolQ tasks: six runs, 900 generations, two independent-seed controls and two cross-family comparisons. Three comparisons were inconclusive and one met the configured equivalence margin. These results remain visible in the local dashboard. They validate the integrated evaluation path, not broad model equivalence or deployment fitness. See `docs/VALIDATION.md` for the measured scores and limitations.
+
+Prepare the same benchmark samples with `venv/bin/python scripts/prepare_benchmarks.py`; prepared sets automatically appear in the dashboard. Model weights, downloaded data, and raw evidence remain outside Git.

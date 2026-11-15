@@ -49,3 +49,11 @@ dist/
 
 # CodeLens Graph local index
 .codelens/
+
+# Local inference runtime and downloaded benchmark evidence
+.tools/
+.runtime/
+data/benchmarks/
+study-workspace/
+example-workspace/
+data/study/

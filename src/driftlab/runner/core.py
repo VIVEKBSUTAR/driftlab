@@ -130,6 +130,7 @@ class BenchmarkRunner:
                 for metric_name in self.metric_names:
                     val = compute_metric(metric_name=metric_name, prediction=text,
                         reference=task.expected_output,
+                        answer_type=task.output_spec.get("answer_type") if task.output_spec else None,
                         required_keys=task.output_spec.get("required_keys") if task.output_spec else None)
                     if not np.isfinite(val):
                         raise ValueError(f"Non-finite score from {metric_name}")

@@ -50,7 +50,9 @@ def test_json_validity():
     assert json_validity(invalid_json) == 0.0
 
 
+@pytest.mark.embeddings
 def test_embedding_similarity():
+    pytest.importorskip("sentence_transformers", reason="Install driftlab[embeddings] for semantic scoring tests")
     # Exact match strings should have similarity 1.0
     sim_same = embedding_similarity("The quick brown fox", "The quick brown fox")
     assert pytest.approx(sim_same, abs=1e-3) == 1.0
@@ -79,3 +81,13 @@ def test_compute_metric_dispatcher():
 
     with pytest.raises(ValueError, match="Unknown metric"):
         compute_metric("nonexistent_metric", "foo", "bar")
+
+
+def test_benchmark_answer_matching():
+    assert compute_metric("answer_match", "Working: 2+2=4. #### 4", "4", answer_type="numeric") == 1
+    assert compute_metric("answer_match", "#### 1,200.00", "1200", answer_type="numeric") == 1
+    assert compute_metric("answer_match", "No number here", "4", answer_type="numeric") == 0
+    assert compute_metric("answer_match", "#### 5", "4", answer_type="numeric") == 0
+    assert compute_metric("answer_match", "No, the passage disagrees.", "no", answer_type="boolean") == 1
+    assert compute_metric("answer_match", "Yes.", "no", answer_type="boolean") == 0
+    assert compute_metric("answer_match", "It might be yes", "yes", answer_type="boolean") == 0

@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from dataclasses import asdict
 from functools import lru_cache
 import os
+import json
 from pathlib import Path
 from typing import Literal
 
@@ -10,12 +11,12 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 import requests
 from driftlab import __version__
 from driftlab.client import DriftLab
 from driftlab.config.schemas import GenerationConfig
-from driftlab.datasets.loader import TaskSpec, builtin_tasks
+from driftlab.datasets.loader import TaskSpec, builtin_tasks, validate_tasks, load_dataset
 from driftlab.metrics.functions import METRIC_REGISTRY
 from driftlab.risk.policy import DEFAULT_POLICIES
 from driftlab.reporting import format_drift_markdown_report
@@ -59,6 +60,11 @@ class RunRequest(BaseModel):
     background: bool = False
     db_url: str = DEFAULT_DB_URL
 
+    @field_validator("tasks", mode="before")
+    @classmethod
+    def validate_task_records(cls, value):
+        return None if value is None else validate_tasks(value)
+
 
 class CompareRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -88,8 +94,20 @@ def read_root():
 
 @app.get("/catalog")
 def catalog():
-    return {"tasks":[t.model_dump() for t in builtin_tasks()], "policies":[asdict(p) for p in DEFAULT_POLICIES.values()],
-        "metrics":list(METRIC_REGISTRY), "dataset_name":"DriftLab functional suite", "dataset_description":"32 original smoke-test prompts. Synthetic runs validate the pipeline; they are not model-quality research evidence."}
+    tasks = [t.model_dump() for t in builtin_tasks()]
+    description = "32 original smoke-test prompts. Synthetic runs validate the pipeline; they are not model-quality research evidence."
+    datasets = [{"id":"functional", "name":"DriftLab functional suite", "tasks":tasks, "description":description}]
+    for name, label in (("gsm8k","GSM8K · math reasoning"),("boolq","BoolQ · reading comprehension")):
+        path = WORKSPACE / "data" / "benchmarks" / f"{name}.jsonl"
+        if path.exists():
+            source_path = path.with_suffix(".source.json")
+            source = json.loads(source_path.read_text()) if source_path.exists() else {}
+            records = [t.model_dump() for t in load_dataset(path)]
+            datasets.append({"id":name,"name":label,"tasks":records,"source":source,
+                "description":f"{len(records)} deterministically sampled {source.get('split','evaluation')} prompts. Source license: {source.get('license','see source metadata')}. Scored with answer_match."})
+    return {"tasks":tasks, "policies":[asdict(p) for p in DEFAULT_POLICIES.values()], "datasets":datasets,
+        "metrics":list(METRIC_REGISTRY), "dataset_name":"DriftLab functional suite", "dataset_description":description}
+
 
 
 @app.get("/models")

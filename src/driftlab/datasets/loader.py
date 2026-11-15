@@ -18,6 +18,8 @@ class TaskSpec(BaseModel):
 
 
 def validate_tasks(records: list[dict]) -> list[TaskSpec]:
+    if not isinstance(records, list) or any(not isinstance(r, dict) for r in records):
+        raise ValueError("Tasks must be a list of objects.")
     if not records:
         raise ValueError("Dataset must contain at least one prompt.")
     tasks = [TaskSpec.model_validate({"id": r.get("id", f"t_{i}"),

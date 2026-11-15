@@ -60,6 +60,7 @@ class DriftLab:
         for record in records:
             record["id"] = "task_" + digest(record)
             task_items.append(TaskItem(**record))
+        builtin_mock = adapter is None and model == "mock"
         if adapter is None:
             if model == "mock":
                 refs = {t.prompt: t.expected_output or "{}" for t in task_items}
@@ -68,8 +69,9 @@ class DriftLab:
                 adapter = MockAdapter(response_sampler=lambda prompt: refs[prompt] if rng.random() < probability else "synthetic incorrect output")
             else:
                 adapter = OllamaAdapter(model)
+        synthetic = isinstance(adapter, MockAdapter)
         desc = adapter.describe()
-        if model == "mock":
+        if builtin_mock:
             desc = {**desc, "identifier": f"mock-{mock_profile}", "profile": mock_profile}
         run_id = "run_" + uuid.uuid4().hex[:12]
         jsonl_path = str(Path(output).resolve() if output else self.workspace / "data" / "runs" / f"{run_id}.jsonl")
@@ -77,7 +79,7 @@ class DriftLab:
             raise ValueError("Output file already exists; choose a new path to preserve evidence.")
         manifest = {"schema_version": 1, "run_id": run_id, "model": desc, "dataset_digest": dataset_hash,
                     "tasks": [asdict(t) for t in task_items], "metrics": metrics, "repeats": repeats,
-                    "seed": seed, "generation": generation.model_dump(), "synthetic": model == "mock",
+                    "seed": seed, "generation": generation.model_dump(), "synthetic": synthetic,
                     "run_type": run_type, "environment": {"driftlab":"0.1.0", "numpy":np.__version__}}
         path = Path(jsonl_path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -156,7 +158,7 @@ class DriftLab:
                 "observations": [dict(task_id=o.task_id, task_key=o.task.task_key, prompt=o.task.prompt,
                     reference=o.task.expected_output, category=o.task.category, risk_level=o.task.risk_level,
                     repeat_index=o.repeat_index, raw_output=o.raw_output, latency_ms=o.latency_ms, error=o.error,
-                    scores={m.metric_name:m.value for m in o.metric_results}) for o in sorted(r.observations, key=lambda o:(o.task_id,o.repeat_index))]}
+                    scores={m.metric_name:m.value for m in o.metric_results}) for o in sorted(r.observations, key=lambda o:(o.task.task_key,o.repeat_index))]}
 
     def compare(self, baseline_run_id, candidate_run_id, seed=42, noise_floor=None, n_resamples=2000, n_permutations=2000):
         """Compare matched datasets; Holm-adjust all category/metric/risk hypotheses."""

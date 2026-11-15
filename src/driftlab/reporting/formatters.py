@@ -21,7 +21,7 @@ STATUS_BADGES = {
 def format_drift_table(verdicts: List[DriftVerdict]) -> str:
     """Formats a list of drift verdicts into a markdown table."""
     lines = [
-        "| Category | Metric | Risk Tier | Estimate | 95% CI | Noise Floor | Margin | p-adj | Status |",
+        "| Category | Metric | Risk Tier | Estimate | Policy CI | Noise Floor | Margin | p-adj | Status |",
         "| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |",
     ]
     for v in verdicts:
@@ -77,7 +77,7 @@ def format_drift_markdown_report(
         lines.append(f"### `{v.category}` - `{v.metric_id}`: {badge}")
         lines.append(f"- **Decision**: {v.explanation}")
         lines.append(f"- **Point Estimate**: {v.estimate:+.4f}")
-        lines.append(f"- **Confidence Interval**: [{v.ci_low:+.4f}, {v.ci_high:+.4f}]")
+        lines.append(f"- **Confidence Interval** ({100 * v.details.get('confidence_level', 1 - v.details.get('alpha', 0.05)):.1f}%): [{v.ci_low:+.4f}, {v.ci_high:+.4f}]")
         lines.append(f"- **Adjusted p-value**: {v.p_adjusted:.4g} (alpha={v.details.get('alpha', 'default')})")
         lines.append(f"- **Equivalence Margin**: ±{v.margin:.4f}")
         lines.append(f"- **Noise Floor**: {v.noise_floor:.4f}")
