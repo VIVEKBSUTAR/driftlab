@@ -39,6 +39,9 @@ export interface RunRecord {
   jsonl_path: string | null;
   created_at: string | null;
   observations_count: number;
+  expected_observations?: number;
+  synthetic?: boolean;
+  error?: string | null;
 }
 
 export interface RunDetail extends RunRecord {
@@ -48,6 +51,7 @@ export interface RunDetail extends RunRecord {
     digest: string | null;
   };
   aggregates: PromptAggregateItem[];
+  observations?: Array<{ task_id: string; category: string; latency_ms: number; error: string | null; scores: Record<string, number> }>;
 }
 
 export interface CompareRequest {
@@ -58,6 +62,10 @@ export interface CompareRequest {
 }
 
 export interface CompareResponse {
+  id?: string;
+  created_at?: string;
+  baseline?: RunRecord;
+  candidate?: RunRecord;
   baseline_run_id: string;
   candidate_run_id: string;
   verdicts: DriftVerdict[];

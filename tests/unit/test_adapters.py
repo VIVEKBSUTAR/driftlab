@@ -56,7 +56,7 @@ def test_ollama_adapter(mock_get, mock_post):
     assert desc["family"] == "llama"
     assert desc["identifier"] == "llama3:latest"
     assert desc["quantization"] == "Q4_0"
-    assert desc["digest"] == "abcdef123456"
+    assert desc["digest"] == "abcdef1234567890"
     
     # Test generate
     res = adapter.generate("Hello", "System prompt", config)

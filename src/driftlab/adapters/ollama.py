@@ -22,17 +22,18 @@ class OllamaAdapter(ModelAdapter):
         payload = {
             "model": self.model_name,
             "prompt": prompt,
-            "system": system_prompt,
+            "system": system_prompt or "",
             "stream": False,
             "options": {
                 "temperature": config.temperature,
                 "top_p": config.top_p,
                 "num_predict": config.max_tokens,
-                "stop": config.stop_sequences or []
+                "stop": config.stop_sequences or [],
+                "seed": config.seed
             }
         }
         
-        response = requests.post(f"{self.base_url}/api/generate", json=payload)
+        response = requests.post(f"{self.base_url}/api/generate", json=payload, timeout=config.timeout_seconds)
         response.raise_for_status()
         data = response.json()
         
@@ -50,7 +51,7 @@ class OllamaAdapter(ModelAdapter):
         """
         Fetches the model information from the Ollama API.
         """
-        response = requests.get(f"{self.base_url}/api/tags")
+        response = requests.get(f"{self.base_url}/api/tags", timeout=10)
         response.raise_for_status()
         models = response.json().get("models", [])
         
@@ -64,7 +65,7 @@ class OllamaAdapter(ModelAdapter):
         return {
             "family": details.get("family", "unknown"),
             "identifier": self.model_name,
-            "digest": model_info.get("digest", "unknown")[:12],
+            "digest": model_info.get("digest", "unknown"),
             "quantization": details.get("quantization_level", "unknown"),
             "backend_version": "ollama-api"
         }

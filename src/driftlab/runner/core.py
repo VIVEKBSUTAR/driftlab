@@ -8,6 +8,8 @@ and optionally synchronizes results into SQLite.
 
 from dataclasses import dataclass, field
 from pathlib import Path
+import time
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
 import numpy as np
 from sqlalchemy.orm import Session
@@ -58,6 +60,11 @@ class BenchmarkRunner:
         metric_names: Optional[List[str]] = None,
         seed_base: int = 42,
     ) -> None:
+        if repeats < 1:
+            raise ValueError("repeats must be positive")
+        unknown = set(metric_names or ["exact_match"]) - set(METRIC_REGISTRY)
+        if unknown:
+            raise ValueError(f"Unknown metrics: {sorted(unknown)}")
         self.adapter = adapter
         self.repeats = repeats
         self.generation_config = generation_config or GenerationConfig()
@@ -93,11 +100,11 @@ class BenchmarkRunner:
                     timeout_seconds=self.generation_config.timeout_seconds,
                 )
 
-                gen_res = self.adapter.generate(
-                    prompt=task.prompt,
-                    system_prompt=task.system_prompt,
-                    config=config_with_seed,
-                )
+                started = time.perf_counter()
+                try:
+                    gen_res = self.adapter.generate(prompt=task.prompt, system_prompt=task.system_prompt, config=config_with_seed)
+                except Exception as exc:
+                    gen_res = {"text": "", "error": str(exc), "latency_ms": (time.perf_counter()-started)*1000}
 
                 # Safely retrieve response fields from GenerationResult dict or object
                 text = gen_res["text"] if isinstance(gen_res, dict) else getattr(gen_res, "text", "")
@@ -117,22 +124,19 @@ class BenchmarkRunner:
                 append_observation_record(jsonl_path_str, record)
                 observations_count += 1
 
-                # Calculate metrics for this repetition
+                if error:
+                    raise RuntimeError(f"Generation failed for {task.task_key}: {error}")
+                scores = {}
                 for metric_name in self.metric_names:
-                    try:
-                        val = compute_metric(
-                            metric_name=metric_name,
-                            prediction=text,
-                            reference=task.expected_output,
-                            required_keys=(
-                                task.output_spec.get("required_keys")
-                                if task.output_spec and isinstance(task.output_spec, dict)
-                                else None
-                            ),
-                        )
-                    except Exception:
-                        val = 0.0
+                    val = compute_metric(metric_name=metric_name, prediction=text,
+                        reference=task.expected_output,
+                        required_keys=task.output_spec.get("required_keys") if task.output_spec else None)
+                    if not np.isfinite(val):
+                        raise ValueError(f"Non-finite score from {metric_name}")
                     metric_values[task.id][metric_name].append(val)
+                    scores[metric_name] = val
+                # Raw output was already flushed; scoring errors cannot erase it.
+                append_observation_record(str(jsonl_path_str) + ".scores.jsonl", {**record, "scores": scores})
 
         # Compute prompt-level aggregates (mean and std across repeats)
         aggregates: Dict[str, Dict[str, Dict[str, float]]] = {}
@@ -216,6 +220,7 @@ class BenchmarkRunner:
         run_record = db_session.query(Run).filter_by(id=run_id).first()
         if run_record:
             run_record.status = "completed"
+            run_record.completed_at = datetime.now(timezone.utc)
             run_record.jsonl_path = jsonl_path
 
         db_session.flush()

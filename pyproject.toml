@@ -1,30 +1,34 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "driftlab"
 version = "0.1.0"
-description = "A framework for behavioral drift detection and validation in local LLMs."
+description = "Reproducible, risk-aware statistical evaluation of LLM behavioral drift."
+readme = "README.md"
 requires-python = ">=3.11"
+license = {text = "MIT"}
+classifiers = ["Programming Language :: Python :: 3", "Topic :: Scientific/Engineering :: Artificial Intelligence"]
 dependencies = [
-    "fastapi>=0.100.0",
-    "sqlalchemy>=2.0.0",
-    "pydantic>=2.0.0",
-    "numpy>=1.24.0",
-    "scipy>=1.10.0",
-    "statsmodels>=0.14.0",
-    "sentence-transformers>=2.2.0",
-    "typer>=0.9.0",
-    "requests>=2.31.0",
-    "uvicorn>=0.20.0",
+  "fastapi>=0.100,<1", "sqlalchemy>=2,<3", "pydantic>=2,<3",
+  "numpy>=1.24,<3", "scipy>=1.10,<2", "statsmodels>=0.14,<1",
+  "typer>=0.9,<1", "requests>=2.31,<3", "uvicorn>=0.20,<1"
 ]
-
 
 [project.scripts]
 driftlab = "driftlab.cli.main:app"
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-]
+embeddings = ["sentence-transformers>=2.2,<7"]
+dev = ["pytest>=7,<10", "httpx>=0.24,<1", "build>=1,<2", "wheel>=0.40"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"driftlab.api" = ["static/*", "static/assets/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["embeddings: requires optional embedding dependencies and cached model weights"]

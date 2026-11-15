@@ -1,159 +1,164 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Eye, Filter, RefreshCw, Layers, Plus } from 'lucide-react';
+import { Search, Eye, RefreshCw, Plus } from 'lucide-react';
 import { RunRecord } from '../../types/api';
 import { fetchRuns } from '../../services/api';
 import { RunDetailModal } from './RunDetailModal';
-import { Skeleton } from '../common/Skeleton';
 
 interface RunsListProps {
   onNavigateToStudio: () => void;
 }
 
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
+
 export const RunsList: React.FC<RunsListProps> = ({ onNavigateToStudio }) => {
   const [runs, setRuns] = useState<RunRecord[]>([]);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
-  const loadData = async () => {
+  const load = async () => {
     setLoading(true);
+    setError('');
     try {
-      const data = await fetchRuns();
-      setRuns(data);
+      setRuns(await fetchRuns());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load runs.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  const filteredRuns = runs.filter((r) => {
-    const matchesSearch =
-      r.id.toLowerCase().includes(search.toLowerCase()) ||
-      (r.model_identifier && r.model_identifier.toLowerCase().includes(search.toLowerCase()));
-    const matchesType = filterType === 'all' || r.run_type === filterType;
-    return matchesSearch && matchesType;
+  const filtered = runs.filter((r) => {
+    const q = search.toLowerCase();
+    const matchSearch =
+      r.id.toLowerCase().includes(q) ||
+      (r.model_identifier?.toLowerCase().includes(q) ?? false);
+    const matchType = filterType === 'all' || r.run_type === filterType;
+    return matchSearch && matchType;
   });
 
   return (
-    <div className="space-y-5">
-      {/* Header bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3 border-b border-border-subtle">
+    <div className="space-y-6">
+
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold font-sans text-slate-100 tracking-tight">Experiment Runs Explorer</h1>
-          <p className="text-xs text-slate-400 mt-0.5 font-sans">
-            Browse and inspect recorded benchmark runs, cryptographic model snapshot digests, and prompt observations.
+          <h1 className="text-2xl font-semibold text-text-primary tracking-tight mb-1">Run History</h1>
+          <p className="text-sm text-text-secondary">
+            All recorded benchmark runs. Click a row to inspect its details.
           </p>
         </div>
-
         <div className="flex items-center gap-2">
           <button
-            onClick={loadData}
-            className="p-1.5 bg-surface-low hover:bg-surface-high text-slate-300 border border-border-subtle rounded-[4px] transition-colors cursor-pointer"
-            title="Refresh runs"
+            onClick={load}
+            className="p-2 bg-bg-card hover:bg-bg-elevated text-text-secondary border border-border-base rounded transition-colors"
+            title="Refresh"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={onNavigateToStudio}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-telemetry-emerald hover:bg-telemetry-emeraldLight text-surface-lowest text-xs font-mono font-semibold rounded-[4px] shadow-sm transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-accent hover:bg-accent-light text-text-inverse text-sm font-medium rounded transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Benchmark Run</span>
+            <Plus className="w-4 h-4" />
+            New Run
           </button>
         </div>
       </div>
 
-      {/* Filter and Search controls */}
-      <div className="bg-surface-low border border-border-subtle rounded-[4px] p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:w-72">
-          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2" />
+      {/* Search + filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
           <input
             type="text"
-            placeholder="Search run ID or model..."
+            placeholder="Search by run ID or model name…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-surface-lowest border border-border-subtle rounded-[3px] pl-8 pr-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-border-focus font-mono"
+            className="w-full bg-bg-card border border-border-base rounded px-3 py-2 pl-9 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-border-focus"
           />
         </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto font-mono text-xs">
-          <Filter className="w-3 h-3 text-slate-400" />
-          <span className="text-slate-400 text-[11px]">Type:</span>
+        <div className="flex items-center gap-1 p-1 bg-bg-card border border-border-base rounded">
           {['all', 'baseline', 'candidate'].map((t) => (
             <button
               key={t}
               onClick={() => setFilterType(t)}
-              className={`px-2 py-0.5 rounded-[2px] text-[11px] font-mono transition-colors ${
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors capitalize ${
                 filterType === t
-                  ? 'bg-telemetry-emerald/15 text-telemetry-emerald border border-telemetry-emerald/30 font-semibold'
-                  : 'text-slate-400 hover:text-slate-200 border border-transparent hover:bg-surface-high'
+                  ? 'bg-bg-elevated text-text-primary'
+                  : 'text-text-muted hover:text-text-secondary'
               }`}
             >
-              {t.toUpperCase()}
+              {t}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Runs Table */}
-      <div className="bg-surface-low border border-border-subtle rounded-[4px] overflow-hidden">
+      {error && <p role="alert" className="p-4 rounded-lg border border-status-red/30 text-status-red">{error}</p>}
+      {/* Table */}
+      <div className="bg-bg-card border border-border-base rounded-lg overflow-hidden">
         {loading ? (
-          <div className="p-4 space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
+          <div className="p-6 space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-10 bg-bg-elevated rounded animate-pulse" />
+            ))}
           </div>
-        ) : filteredRuns.length > 0 ? (
+        ) : filtered.length === 0 ? (
+          <div className="py-16 text-center">
+            <p className="text-sm text-text-secondary">No runs found.</p>
+            <p className="text-xs text-text-muted mt-1">Try a different search or create a new run.</p>
+          </div>
+        ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-surface-high/60 text-slate-400 border-b border-border-subtle uppercase text-[10px] tracking-wider font-semibold">
-                <tr>
-                  <th className="px-4 py-2.5">Run ID</th>
-                  <th className="px-4 py-2.5">Type</th>
-                  <th className="px-4 py-2.5">Model Snapshot</th>
-                  <th className="px-4 py-2.5">Status</th>
-                  <th className="px-4 py-2.5 text-right">Observations</th>
-                  <th className="px-4 py-2.5">Created</th>
-                  <th className="px-4 py-2.5 text-center">Inspect</th>
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="border-b border-border-base text-xs text-text-muted uppercase tracking-wide">
+                  <th className="px-5 py-3 font-medium">Run ID</th>
+                  <th className="px-5 py-3 font-medium">Type</th>
+                  <th className="px-5 py-3 font-medium">Model</th>
+                  <th className="px-5 py-3 font-medium text-right">Observations</th>
+                  <th className="px-5 py-3 font-medium">Created</th>
+                  <th className="px-5 py-3 font-medium text-center">Details</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border-subtle bg-surface-lowest">
-                {filteredRuns.map((r) => (
-                  <tr key={r.id} className="hover:bg-surface-high/20 transition-colors">
-                    <td className="px-4 py-2.5 font-semibold text-slate-200">{r.id}</td>
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={`inline-block px-1.5 py-0.2 rounded-[2px] border text-[10px] uppercase font-bold ${
-                          r.run_type === 'baseline'
-                            ? 'bg-telemetry-indigo/15 text-telemetry-indigoLight border-telemetry-indigo/30'
-                            : 'bg-telemetry-violet/15 text-telemetry-violetLight border-telemetry-violet/30'
-                        }`}
-                      >
+              <tbody className="divide-y divide-border-muted">
+                {filtered.map((r) => (
+                  <tr
+                    key={r.id}
+                    className="hover:bg-bg-elevated transition-colors cursor-pointer"
+                    onClick={() => setSelectedRunId(r.id)}
+                  >
+                    <td className="px-5 py-3 font-mono text-text-primary font-medium">{r.id}</td>
+                    <td className="px-5 py-3">
+                      <span className={`inline-block px-2 py-0.5 rounded text-2xs font-medium uppercase ${
+                        r.run_type === 'baseline'
+                          ? 'bg-status-blueDim text-status-blue'
+                          : 'bg-status-purpleDim text-status-purple'
+                      }`}>
                         {r.run_type}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-slate-300 font-sans font-medium">{r.model_identifier || 'Unknown'}</td>
-                    <td className="px-4 py-2.5">
-                      <span className="inline-flex items-center gap-1.5 text-telemetry-emerald text-[11px]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-telemetry-emerald" />
-                        {r.status}
-                      </span>
+                    <td className="px-5 py-3 text-text-secondary">{r.model_identifier ?? '—'}</td>
+                    <td className="px-5 py-3 text-right font-mono text-text-primary">{r.observations_count}</td>
+                    <td className="px-5 py-3 text-text-muted text-xs">
+                      {r.created_at ? formatDate(r.created_at) : '—'}
                     </td>
-                    <td className="px-4 py-2.5 text-right font-bold text-slate-200">{r.observations_count}</td>
-                    <td className="px-4 py-2.5 text-slate-500 text-[11px]">
-                      {r.created_at ? new Date(r.created_at).toLocaleDateString() : 'N/A'}
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
+                    <td className="px-5 py-3 text-center">
                       <button
-                        onClick={() => setSelectedRunId(r.id)}
-                        className="p-1 bg-surface-low hover:bg-surface-high hover:text-telemetry-emerald text-slate-400 rounded-[3px] border border-border-subtle transition-colors cursor-pointer"
-                        title="View run snapshot and aggregates"
+                        onClick={(e) => { e.stopPropagation(); setSelectedRunId(r.id); }}
+                        className="p-1.5 rounded hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors"
+                        title="View details"
                       >
-                        <Eye className="w-3.5 h-3.5" />
+                        <Eye className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>
@@ -161,16 +166,9 @@ export const RunsList: React.FC<RunsListProps> = ({ onNavigateToStudio }) => {
               </tbody>
             </table>
           </div>
-        ) : (
-          <div className="p-8 text-center">
-            <Layers className="w-6 h-6 text-slate-600 mx-auto mb-2" />
-            <p className="text-xs font-semibold text-slate-300 font-mono">No matching runs found</p>
-            <p className="text-[11px] text-slate-500 mt-0.5 font-sans">Try adjusting your search criteria or launch a new run.</p>
-          </div>
         )}
       </div>
 
-      {/* Detail Modal */}
       <RunDetailModal runId={selectedRunId} onClose={() => setSelectedRunId(null)} />
     </div>
   );

@@ -1,248 +1,99 @@
-import React, { useEffect, useState } from 'react';
-import {
-  Activity,
-  Layers,
-  ArrowRight,
-  TrendingUp,
-  Cpu,
-  CheckCircle2,
-  AlertTriangle,
-  AlertOctagon,
-  HelpCircle,
-  Clock,
-  Sliders,
-} from 'lucide-react';
-import { RunRecord } from '../../types/api';
-import { fetchRuns } from '../../services/api';
-import { MetricCard } from '../common/MetricCard';
-import { Skeleton } from '../common/Skeleton';
+import { useEffect, useState } from 'react';
+import { RunRecord, RunDetail } from '../../types/api';
+import { fetchRuns, fetchRunDetail } from '../../services/api';
 
-interface OverviewProps {
-  onNavigate: (tab: string) => void;
+const colors = ['#c0b0f5', '#8faed4', '#9bc8b2', '#cfba94'];
+const number = (n: number) => n.toLocaleString();
+
+export function BenchmarkMetrics() {
+  const [runs, setRuns] = useState<RunRecord[]>([]);
+  const [detail, setDetail] = useState<RunDetail | null>(null);
+  const [selected, setSelected] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [detailError, setDetailError] = useState('');
+
+  const load = async () => {
+    setLoading(true); setError('');
+    try {
+      const records = await fetchRuns();
+      setRuns(records);
+      setSelected(current => records.some(r => r.id === current && r.status === 'completed') ? current : records.find(r => r.status === 'completed')?.id ?? '');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not load metrics.'); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    let active = true;
+    setDetail(null); setDetailError('');
+    if (!selected) return;
+    setDetailLoading(true);
+    fetchRunDetail(selected).then(data => { if (active) setDetail(data); })
+      .catch(e => { if (active) setDetailError(e.message); })
+      .finally(() => { if (active) setDetailLoading(false); });
+    return () => { active = false; };
+  }, [selected, runs]);
+
+  const completed = runs.filter(r => r.status === 'completed');
+  const statuses = ['completed', 'running', 'pending', 'failed'];
+  const timeline = [...runs].filter(r => r.created_at).sort((a, b) => Date.parse(a.created_at!) - Date.parse(b.created_at!)).slice(-12);
+  const maximum = Math.max(1, ...timeline.map(r => r.observations_count));
+  const metrics = [...new Set(detail?.aggregates.map(a => a.metric_name) ?? [])];
+  const latencies = (detail?.observations ?? []).filter(o => !o.error && Number.isFinite(o.latency_ms)).map(o => o.latency_ms).sort((a, b) => a - b);
+  const meanLatency = latencies.length ? latencies.reduce((a, b) => a + b, 0) / latencies.length : null;
+  const p95 = latencies.length ? latencies[Math.ceil(latencies.length * .95) - 1] : null;
+
+  return <div className="benchmark-metrics space-y-6 mb-6" aria-busy={loading}>
+    {error && <p role="alert" className="p-4 rounded-lg border border-status-red/30 text-status-red">{error} Metrics may be out of date.</p>}
+    {!loading && !error && !runs.length && <div className="p-8 rounded-lg border border-dashed border-[var(--border)] text-center text-text-secondary">No benchmark data yet. Create a baseline and candidate to populate these charts.</div>}
+    <div className="grid lg:grid-cols-3 gap-4">
+      <Panel title="Observation volume" note="Last 12 runs, oldest to newest · observations per run" className="lg:col-span-2">
+        {timeline.length ? <><svg viewBox="0 0 640 220" role="img" aria-label="Observation count by benchmark run" className="w-full">
+          {[0, .5, 1].map(t => <g key={t}><line x1="45" x2="625" y1={180 - t * 150} y2={180 - t * 150} stroke="#30363d" strokeDasharray="3 4" /><text x="35" y={184 - t * 150} fill="#8b949e" fontSize="11" textAnchor="end">{Math.round(maximum * t)}</text></g>)}
+          {timeline.map((r, i) => { const width = 570 / timeline.length; const height = r.observations_count / maximum * 150;
+            return <g key={r.id}><title>{r.id}: {r.observations_count} observations · {r.run_type} · {r.status}</title><rect x={50 + i * width} y={180 - height} width={Math.max(4, width - 12)} height={height} rx="4" fill={r.run_type === 'baseline' ? colors[0] : colors[1]} /><text x={50 + i * width + (width - 12) / 2} y="202" textAnchor="middle" fill="#8b949e" fontSize="10">{i + 1}</text></g>;
+          })}
+        </svg><div className="flex gap-5 text-xs text-text-secondary"><span><i className="inline-block w-2 h-2 bg-[#c0b0f5] rounded-sm mr-2" />Baseline</span><span><i className="inline-block w-2 h-2 bg-[#8faed4] rounded-sm mr-2" />Candidate</span></div>
+          <details className="text-xs text-text-secondary mt-3"><summary className="cursor-pointer">View chart data</summary><div className="overflow-x-auto"><table className="w-full mt-2 text-left"><thead><tr><th>Run</th><th>Date</th><th>Observations</th></tr></thead><tbody>{timeline.map((r, i) => <tr key={r.id}><td className="py-1">{i + 1}. {r.id}</td><td>{new Date(r.created_at!).toLocaleDateString()}</td><td>{number(r.observations_count)}</td></tr>)}</tbody></table></div></details></> : <Empty loading={loading} />}
+      </Panel>
+      <Panel title="Execution health" note="All recorded runs by current status">
+        <div className="space-y-5 mt-4">{statuses.map((status, i) => { const count = runs.filter(r => r.status === status).length; return <div key={status}>
+          <div className="flex justify-between text-xs mb-2"><span className="capitalize text-text-secondary">{status}</span><span className="font-mono">{loading ? '—' : count}</span></div>
+          <div className="h-2 rounded-full bg-bg-elevated overflow-hidden"><div style={{ width: `${runs.length ? count / runs.length * 100 : 0}%`, background: [colors[2], colors[0], colors[3], '#f87171'][i] }} className="h-full rounded-full" /></div>
+        </div>; })}</div>
+      </Panel>
+    </div>
+    <Panel title="Run quality & performance" note="Mean of prompt-level means; metrics remain separate because their scales differ.">
+      <label className="block text-xs text-text-secondary mt-3 mb-4">Completed run
+        <select value={selected} onChange={e => setSelected(e.target.value)} className="block mt-2 w-full bg-bg-page border border-[var(--border)] rounded-lg p-2 text-text-primary">
+          {!completed.length && <option value="">No completed runs</option>}
+          {completed.map(r => <option key={r.id} value={r.id}>{r.model_identifier} · {r.id}{r.synthetic ? ' · Synthetic' : ''}</option>)}
+        </select>
+      </label>
+      {detailError && <p role="alert" className="text-status-red text-sm">{detailError}</p>}
+      {detail?.synthetic && <p className="text-xs text-status-amber mb-4">Synthetic benchmark: validates pipeline behavior; does not establish model quality.</p>}
+      {detailLoading ? <Empty loading /> : metrics.length ? <div className="grid md:grid-cols-2 gap-8">
+        <div className="space-y-5">{metrics.map((metric, i) => {
+          const values = detail!.aggregates.filter(a => a.metric_name === metric);
+          const mean = values.reduce((s, a) => s + a.mean_value, 0) / values.length;
+          const min = metric === 'embedding_similarity' ? -1 : 0;
+          const start = min === -1 ? 50 : 0;
+          const end = (mean - min) / (1 - min) * 100;
+          return <div key={metric}><div className="flex justify-between text-xs mb-2"><span className="text-text-secondary">{metric.replace(/_/g, ' ')}</span><strong className="font-mono">{mean.toFixed(4)}</strong></div>
+            <div role="img" aria-label={`${metric}: ${mean.toFixed(4)}, scale ${min} to 1, ${values.length} prompts`} className="h-3 relative rounded bg-bg-elevated"><div className="absolute h-full rounded" style={{ left: `${Math.min(start, end)}%`, width: `${Math.abs(end - start)}%`, background: colors[i % colors.length] }} /><div className="absolute inset-y-0 border-l border-text-muted" style={{ left: `${start}%` }} /></div>
+            <div className="flex justify-between text-2xs text-[#959dab] mt-1"><span>{min}</span><span>{values.length} prompts</span><span>1</span></div></div>;
+        })}</div>
+        <div className="grid grid-cols-2 gap-3 content-start"><Stat label="Mean latency" value={meanLatency === null ? '—' : `${meanLatency.toFixed(0)} ms`} note="Successful generations" /><Stat label="P95 latency" value={p95 === null ? '—' : `${p95.toFixed(0)} ms`} note="Nearest-rank 95th percentile" /></div>
+      </div> : !detailError && <Empty loading={false} />}
+    </Panel>
+  </div>;
 }
 
-export const Overview: React.FC<OverviewProps> = ({ onNavigate }) => {
-  const [runs, setRuns] = useState<RunRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await fetchRuns();
-        setRuns(data);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
-
-  const totalRuns = runs.length;
-  const baselineCount = runs.filter((r) => r.run_type === 'baseline').length;
-  const candidateCount = runs.filter((r) => r.run_type === 'candidate').length;
-  const totalObservations = runs.reduce((acc, r) => acc + (r.observations_count || 0), 0);
-
-  const decisionRules = [
-    {
-      rule: '1. Insufficient Data',
-      desc: 'Prompt or repeat count below risk policy minimum sample size.',
-      badge: 'bg-slate-500/10 text-slate-300 border-slate-600/30',
-      icon: Clock,
-    },
-    {
-      rule: '2. High Risk Regression',
-      desc: 'Statistically significant drop in quality beyond declared margin in high/critical risk task.',
-      badge: 'bg-rose-500/10 text-rose-300 border-rose-500/30',
-      icon: AlertOctagon,
-    },
-    {
-      rule: '3. Meaningful Drift',
-      desc: 'Statistically significant difference with effect size exceeding the practical equivalence margin.',
-      badge: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
-      icon: AlertTriangle,
-    },
-    {
-      rule: '4. Detected (Low Impact)',
-      desc: 'Statistically detected difference, but effect size lies safely inside the acceptable margin.',
-      badge: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30',
-      icon: Activity,
-    },
-    {
-      rule: '5. No Meaningful Drift',
-      desc: 'Equivalence confirmed: entire confidence interval lies inside the practical margin corridor.',
-      badge: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
-      icon: CheckCircle2,
-    },
-    {
-      rule: '6. Insufficient Evidence',
-      desc: 'Absence of statistical significance is never proof of no drift. Reported as no sufficient evidence.',
-      badge: 'bg-purple-500/10 text-purple-300 border-purple-500/30',
-      icon: HelpCircle,
-    },
-  ];
-
-  return (
-    <div className="space-y-6">
-      {/* Telemetry Hero Panel */}
-      <div className="bg-surface-low border border-border-subtle rounded-[4px] p-6 lg:p-7 relative overflow-hidden">
-        <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-[2px] bg-telemetry-emerald/10 text-telemetry-emerald border border-telemetry-emerald/30 text-[11px] font-mono mb-3 font-semibold">
-            <Sliders className="w-3.5 h-3.5 text-telemetry-emerald" />
-            <span>Statistical Equivalence & Drift Governance</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-bold font-sans text-slate-100 tracking-tight leading-tight">
-            Behavioral Drift Detection & Statistical Validation
-          </h1>
-          <p className="mt-2 text-xs text-slate-400 leading-relaxed font-sans">
-            Distinguish true model drift from natural run-to-run variability. DriftLab combines prompt-clustered BCa bootstrap confidence intervals, label permutation tests, and task-specific risk policy margins.
-          </p>
-
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => onNavigate('comparison')}
-              className="flex items-center gap-2 px-4 py-2 bg-telemetry-emerald hover:bg-telemetry-emeraldLight text-surface-lowest text-xs font-mono font-semibold rounded-[4px] shadow-sm transition-colors cursor-pointer"
-            >
-              <span>Launch Drift Workbench</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onNavigate('explorer')}
-              className="flex items-center gap-2 px-4 py-2 bg-surface-high hover:bg-surface-highest text-slate-200 border border-border-subtle text-xs font-mono font-medium rounded-[4px] transition-colors cursor-pointer"
-            >
-              <Cpu className="w-4 h-4 text-telemetry-emerald" />
-              <span>Prompt Diff Explorer</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* KPI Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Recorded Runs"
-          value={loading ? '...' : totalRuns}
-          subtitle={`${baselineCount} Baseline / ${candidateCount} Candidate`}
-          icon={Layers}
-          badge="SQLite Store"
-          badgeColor="brand"
-        />
-        <MetricCard
-          title="Observations Logged"
-          value={loading ? '...' : totalObservations}
-          subtitle="Prompt repeats in JSONL"
-          icon={Activity}
-          badge="Immutable Truth"
-          badgeColor="emerald"
-        />
-        <MetricCard
-          title="Statistical Coverage"
-          value="95% BCa"
-          subtitle="Prompt-clustered bootstrap"
-          icon={TrendingUp}
-          badge="Calibrated"
-          badgeColor="emerald"
-        />
-        <MetricCard
-          title="Active Backends"
-          value="Ollama + Mock"
-          subtitle="Local & deterministic GPUs"
-          icon={Cpu}
-          badge="Zero-GPU CI/CD"
-          badgeColor="amber"
-        />
-      </div>
-
-      {/* The 6 Decision Rules Section */}
-      <div className="bg-surface-low border border-border-subtle rounded-[4px] p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-sm font-bold font-sans text-slate-100 tracking-tight">The 6 Ordered Decision Rules</h2>
-            <p className="text-xs text-slate-400 font-sans mt-0.5">
-              Applied in strict sequence. Absence of statistical significance is never reported as proof of no drift.
-            </p>
-          </div>
-          <span className="text-[11px] font-mono text-telemetry-emerald bg-telemetry-emerald/10 px-2 py-0.5 rounded-[2px] border border-telemetry-emerald/20 font-semibold">
-            Hierarchy Engine
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {decisionRules.map((rule, idx) => {
-            const Icon = rule.icon;
-            return (
-              <div
-                key={idx}
-                className="bg-surface-lowest border border-border-subtle rounded-[3px] p-3 hover:border-slate-700 transition-colors flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-mono text-xs font-semibold text-slate-100">{rule.rule}</span>
-                    <div className={`p-1 rounded-[2px] border ${rule.badge}`}>
-                      <Icon className="w-3.5 h-3.5" />
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-400 leading-relaxed font-sans">{rule.desc}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Recent Runs Preview */}
-      <div className="bg-surface-low border border-border-subtle rounded-[4px] p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold font-sans text-slate-100 tracking-tight">Recent Benchmark Runs</h2>
-          <button
-            onClick={() => onNavigate('runs')}
-            className="text-xs font-mono font-semibold text-telemetry-emerald hover:underline flex items-center gap-1"
-          >
-            <span>View All Runs</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : runs.length > 0 ? (
-          <div className="divide-y divide-border-subtle overflow-hidden rounded-[3px] border border-border-subtle bg-surface-lowest">
-            {runs.slice(0, 4).map((run) => (
-              <div
-                key={run.id}
-                className="p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 hover:bg-surface-high/30 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded-[2px] border ${
-                      run.run_type === 'baseline'
-                        ? 'bg-telemetry-indigo/15 text-telemetry-indigoLight border-telemetry-indigo/30'
-                        : 'bg-telemetry-violet/15 text-telemetry-violetLight border-telemetry-violet/30'
-                    }`}
-                  >
-                    {run.run_type}
-                  </span>
-                  <div>
-                    <span className="font-mono text-xs font-semibold text-slate-200 block">{run.id}</span>
-                    <span className="text-[11px] text-slate-400 font-mono">{run.model_identifier || 'Unknown Model'}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 text-xs font-mono text-slate-400">
-                  <span>{run.observations_count} observations</span>
-                  <span className="text-slate-500">
-                    {run.created_at ? new Date(run.created_at).toLocaleDateString() : 'Recent'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-slate-500 py-4 text-center font-mono">No runs recorded yet.</p>
-        )}
-      </div>
-    </div>
-  );
-};
+function Stat({ label, value, note }: { label: string; value: string; note: string }) {
+  return <div className="p-5 rounded-lg bg-[var(--surface)] border border-[var(--border)]"><p className="text-xs text-text-secondary">{label}</p><p className="text-2xl font-semibold font-mono tracking-tight mt-2">{value}</p><p className="text-xs text-[#959dab] mt-2">{note}</p></div>;
+}
+function Panel({ title, note, children, className = '' }: { title: string; note: string; children: React.ReactNode; className?: string }) {
+  return <section className={`p-5 rounded-lg bg-[var(--surface)] border border-[var(--border)] min-w-0 ${className}`}><h2 className="text-sm font-semibold">{title}</h2><p className="text-xs text-[#959dab] mt-1 mb-3 break-words">{note}</p>{children}</section>;
+}
+function Empty({ loading }: { loading: boolean }) { return <p className="text-sm text-[#959dab] py-12 text-center">{loading ? 'Loading metrics…' : 'No observations available.'}</p>; }

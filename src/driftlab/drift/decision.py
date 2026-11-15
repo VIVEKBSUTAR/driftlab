@@ -192,7 +192,12 @@ def compare_runs_for_drift(
     n_prompts = len(common_prompts)
     
     # Calculate repeats count
-    n_repeats = min(len(baseline_scores[p]) for p in common_prompts) if common_prompts else 0
+    n_repeats = min(min(len(baseline_scores[p]), len(candidate_scores[p])) for p in common_prompts) if common_prompts else 0
+
+    for scores in (baseline_scores, candidate_scores):
+        for values in scores.values():
+            if np.asarray(values).ndim != 1 or not len(values) or not np.isfinite(values).all():
+                raise ValueError("Scores must be nonempty finite 1D arrays.")
 
     if n_prompts == 0:
         return evaluate_drift(
@@ -232,7 +237,7 @@ def compare_runs_for_drift(
         rng=rng,
     )
 
-    return evaluate_drift(
+    verdict = evaluate_drift(
         estimate=est,
         ci_low=ci_low,
         ci_high=ci_high,
@@ -244,3 +249,7 @@ def compare_runs_for_drift(
         category=category,
         metric_id=metric_id,
     )
+
+    verdict.p_value = p_val
+    verdict.details = {"n_prompts": n_prompts, "n_repeats": n_repeats, "alpha": risk_policy.alpha, "confidence_level": 1-risk_policy.alpha, "bootstrap": "BCa; point interval for constant prompt differences"}
+    return verdict

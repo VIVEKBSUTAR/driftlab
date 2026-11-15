@@ -197,3 +197,13 @@ class DriftResult(Base):
     statistical_test_id = Column(String, ForeignKey("statistical_tests.id"), nullable=False)
 
     statistical_test = relationship("StatisticalTest", back_populates="drift_results")
+
+
+class Comparison(Base):
+    """Complete immutable comparison evidence and reproducibility configuration."""
+    __tablename__ = "comparisons"
+    id = Column(String, primary_key=True, default=generate_uuid)
+    baseline_run_id = Column(String, ForeignKey("runs.id"), nullable=False)
+    candidate_run_id = Column(String, ForeignKey("runs.id"), nullable=False)
+    result = Column(JSON, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)

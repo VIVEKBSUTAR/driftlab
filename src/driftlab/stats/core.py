@@ -4,8 +4,13 @@ from typing import Dict, Tuple, List
 
 def bootstrap_ci(differences: np.ndarray, n_resamples: int, rng: np.random.Generator, alpha: float = 0.05) -> Tuple[float, float, float]:
     """Calculates point estimate, lower bound, and upper bound using the BCa method, clustered by prompt."""
+    differences = np.asarray(differences, dtype=float)
+    if differences.ndim != 1 or not len(differences) or not np.all(np.isfinite(differences)):
+        raise ValueError("Differences must be a nonempty finite 1D array.")
+    if n_resamples < 1 or not 0 < alpha < 1:
+        raise ValueError("Invalid bootstrap settings.")
     point_estimate = float(np.mean(differences))
-    if len(differences) < 2:
+    if len(differences) < 2 or np.ptp(differences) < 1e-14:
         return point_estimate, point_estimate, point_estimate
     
     res = scipy.stats.bootstrap(
@@ -16,7 +21,11 @@ def bootstrap_ci(differences: np.ndarray, n_resamples: int, rng: np.random.Gener
         method='BCa', 
         confidence_level=1.0 - alpha
     )
-    return point_estimate, float(res.confidence_interval.low), float(res.confidence_interval.high)
+    low, high = float(res.confidence_interval.low), float(res.confidence_interval.high)
+    if not np.isfinite([low, high]).all():
+        samples = rng.choice(differences, size=(n_resamples, len(differences)), replace=True).mean(axis=1)
+        low, high = np.quantile(samples, [alpha / 2, 1 - alpha / 2])
+    return point_estimate, float(low), float(high)
 
 def permutation_test(baseline: Dict[str, np.ndarray], candidate: Dict[str, np.ndarray], n_permutations: int, rng: np.random.Generator) -> float:
     """Returns a two-sided p-value from within-prompt label permutation given prompt IDs mapped to per-repeat metric values."""
@@ -49,7 +58,7 @@ def permutation_test(baseline: Dict[str, np.ndarray], candidate: Dict[str, np.nd
         if abs(perm_stat) >= abs(obs_stat):
             count_extreme += 1
             
-    return count_extreme / max(1, n_permutations)
+    return (count_extreme + 1) / (n_permutations + 1)
 
 def naive_mannwhitney_comparator(baseline_run_scores: np.ndarray, candidate_run_scores: np.ndarray) -> dict:
     """

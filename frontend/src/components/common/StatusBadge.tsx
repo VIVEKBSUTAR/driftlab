@@ -3,55 +3,70 @@ import { DriftStatus } from '../../types/api';
 
 interface StatusBadgeProps {
   status: DriftStatus;
-  showPip?: boolean;
   className?: string;
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, showPip = true, className = '' }) => {
-  switch (status) {
-    case 'high_risk_regression':
-      return (
-        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[3px] font-mono text-[11px] font-semibold tracking-wider uppercase bg-rose-500/10 text-rose-300 border border-rose-500/30 ${className}`}>
-          {showPip && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />}
-          High Risk Regression
-        </span>
-      );
-    case 'meaningful_drift':
-      return (
-        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[3px] font-mono text-[11px] font-semibold tracking-wider uppercase bg-amber-500/10 text-amber-300 border border-amber-500/30 ${className}`}>
-          {showPip && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
-          Meaningful Drift
-        </span>
-      );
-    case 'statistically_detected_low_impact':
-      return (
-        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[3px] font-mono text-[11px] font-semibold tracking-wider uppercase bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 ${className}`}>
-          {showPip && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />}
-          Detected (Low Impact)
-        </span>
-      );
-    case 'no_meaningful_drift':
-      return (
-        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[3px] font-mono text-[11px] font-semibold tracking-wider uppercase bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 ${className}`}>
-          {showPip && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-          Equivalence Verified
-        </span>
-      );
-    case 'insufficient_evidence':
-      return (
-        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[3px] font-mono text-[11px] font-semibold tracking-wider uppercase bg-purple-500/10 text-purple-300 border border-purple-500/30 ${className}`}>
-          {showPip && <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />}
-          Insufficient Evidence
-        </span>
-      );
-    case 'insufficient_data':
-    default:
-      return (
-        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[3px] font-mono text-[11px] font-semibold tracking-wider uppercase bg-slate-500/10 text-slate-300 border border-slate-600/30 ${className}`}>
-          {showPip && <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />}
-          Insufficient Data
-        </span>
-      );
-  }
+type StatusConfig = {
+  label: string;
+  dot: string;
+  text: string;
+  bg: string;
+  border: string;
 };
 
+const STATUS_MAP: Record<string, StatusConfig> = {
+  no_meaningful_drift: {
+    label: 'Equivalent',
+    dot: 'bg-status-green',
+    text: 'text-status-green',
+    bg: 'bg-status-greenDim',
+    border: 'border-status-green/25',
+  },
+  meaningful_drift: {
+    label: 'Meaningful Drift',
+    dot: 'bg-status-amber',
+    text: 'text-status-amber',
+    bg: 'bg-status-amberDim',
+    border: 'border-status-amber/25',
+  },
+  high_risk_regression: {
+    label: 'High-Risk Regression',
+    dot: 'bg-status-red pulse-dot',
+    text: 'text-status-red',
+    bg: 'bg-status-redDim',
+    border: 'border-status-red/25',
+  },
+  statistically_detected_low_impact: {
+    label: 'Low Impact',
+    dot: 'bg-status-blue',
+    text: 'text-status-blue',
+    bg: 'bg-status-blueDim',
+    border: 'border-status-blue/25',
+  },
+  insufficient_evidence: {
+    label: 'Insufficient Evidence',
+    dot: 'bg-text-muted',
+    text: 'text-text-secondary',
+    bg: 'bg-bg-subtle',
+    border: 'border-border-base',
+  },
+  insufficient_data: {
+    label: 'Insufficient Data',
+    dot: 'bg-text-muted',
+    text: 'text-text-secondary',
+    bg: 'bg-bg-subtle',
+    border: 'border-border-base',
+  },
+};
+
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = '' }) => {
+  const cfg = STATUS_MAP[status] ?? STATUS_MAP.insufficient_data;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium border ${cfg.bg} ${cfg.text} ${cfg.border} ${className}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  );
+};

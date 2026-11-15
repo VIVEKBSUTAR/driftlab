@@ -32,6 +32,7 @@ def hash_dataset(tasks: List[Dict[str, Any]]) -> str:
             "category": t.get("category"),
             "risk_level": t.get("risk_level"),
             "prompt": t.get("prompt"),
+            "system_prompt": t.get("system_prompt"),
             "expected_output": t.get("expected_output"),
             "output_spec": t.get("output_spec"),
         })
@@ -41,6 +42,7 @@ def hash_dataset(tasks: List[Dict[str, Any]]) -> str:
 def hash_model(model_desc: Dict[str, Any]) -> str:
     """Computes a deterministic digest for model description metadata."""
     normalized = {
+        "digest": model_desc.get("digest", ""),
         "family": model_desc.get("family", ""),
         "identifier": model_desc.get("identifier", ""),
         "quantization": model_desc.get("quantization", ""),

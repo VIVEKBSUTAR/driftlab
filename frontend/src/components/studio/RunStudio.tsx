@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlayCircle, CheckCircle, Cpu, Sliders, Sparkles, AlertCircle, ArrowRight } from 'lucide-react';
+import { PlayCircle, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
 import { triggerRun } from '../../services/api';
 import { TriggerRunRequest } from '../../types/api';
 
@@ -7,245 +7,230 @@ interface RunStudioProps {
   onRunCreated: (runId: string) => void;
 }
 
+const AVAILABLE_METRICS = [
+  { id: 'exact_match',          name: 'Exact Match',        desc: 'Checks if the output text matches exactly (normalized)' },
+  { id: 'embedding_similarity', name: 'Semantic Similarity', desc: 'Measures meaning similarity using sentence embeddings' },
+  { id: 'sequence_similarity',  name: 'Character Similarity', desc: 'Character-level SequenceMatcher ratio' },
+  { id: 'json_validity',        name: 'JSON Validity',       desc: 'Checks whether the output is valid, parseable JSON' },
+];
+
 export const RunStudio: React.FC<RunStudioProps> = ({ onRunCreated }) => {
-  const [model, setModel] = useState<string>('mock');
-  const [runType, setRunType] = useState<'baseline' | 'candidate'>('baseline');
-  const [repeats, setRepeats] = useState<number>(3);
-  const [selectedMetrics, setSelectedMetrics] = useState<string[]>([
-    'exact_match',
-    'embedding_similarity',
-  ]);
-  const [loading, setLoading] = useState(false);
-  const [successRunId, setSuccessRunId] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [model, setModel]                   = useState<string>('mock');
+  const [runType, setRunType]               = useState<'baseline' | 'candidate'>('baseline');
+  const [repeats, setRepeats]               = useState<number>(5);
+  const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['exact_match', 'sequence_similarity']);
+  const [loading, setLoading]               = useState(false);
+  const [successRunId, setSuccessRunId]     = useState<string | null>(null);
+  const [errorMsg, setErrorMsg]             = useState<string | null>(null);
 
-  const availableMetrics = [
-    { id: 'exact_match', name: 'Exact Match', desc: 'Normalized string equality (0.0 or 1.0)' },
-    { id: 'embedding_similarity', name: 'Embedding Cosine Sim', desc: 'Sentence-Transformers all-MiniLM-L6-v2' },
-    { id: 'sequence_similarity', name: 'Sequence Similarity', desc: 'Character-level edit distance ratio' },
-    { id: 'json_validity', name: 'JSON Format Validity', desc: 'Validates parseable JSON structure and keys' },
-  ];
-
-  const toggleMetric = (mId: string) => {
+  const toggleMetric = (id: string) =>
     setSelectedMetrics((prev) =>
-      prev.includes(mId) ? prev.filter((id) => id !== mId) : [...prev, mId]
+      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
     );
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedMetrics.length === 0) {
-      setErrorMsg('Please select at least one evaluation metric.');
+      setErrorMsg('Select at least one evaluation metric.');
       return;
     }
-
     setLoading(true);
     setErrorMsg(null);
     try {
-      const payload: TriggerRunRequest = {
-        model,
-        run_type: runType,
-        repeats,
-        metrics: selectedMetrics,
-      };
+      const payload: TriggerRunRequest = { model, run_type: runType, repeats, metrics: selectedMetrics };
       const res = await triggerRun(payload);
       setSuccessRunId(res.run_id);
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to trigger run.');
+      setErrorMsg(err?.message ?? 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5">
-      <div className="pb-3 border-b border-border-subtle">
-        <h1 className="text-xl font-bold font-sans text-slate-100 tracking-tight">Benchmark Execution Studio</h1>
-        <p className="text-xs text-slate-400 mt-0.5 font-sans">
-          Configure and execute prompt benchmark sweeps across local model adapters. Observations are logged immediately to append-only JSONL files.
+    <div className="max-w-2xl space-y-6">
+
+      {/* Page header */}
+      <div>
+        <h1 className="text-2xl font-semibold text-text-primary tracking-tight mb-1">New Benchmark Run</h1>
+        <p className="text-sm text-text-secondary">
+          Configure and record a benchmark run. Run your baseline first, then your modified model as a candidate.
         </p>
       </div>
 
+      {/* Success */}
       {successRunId && (
-        <div className="p-3.5 rounded-[4px] bg-telemetry-emerald/10 border border-telemetry-emerald/30 text-telemetry-emerald flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4 p-4 rounded-lg bg-status-greenDim border border-status-green/25">
           <div className="flex items-center gap-3">
-            <CheckCircle className="w-4 h-4 text-telemetry-emerald shrink-0" />
+            <CheckCircle2 className="w-5 h-5 text-status-green shrink-0" />
             <div>
-              <span className="font-semibold text-xs font-mono block">Run Triggered & Logged Successfully!</span>
-              <span className="text-[11px] font-mono text-telemetry-emeraldLight">Run ID: {successRunId}</span>
+              <p className="text-sm font-semibold text-status-green">Run recorded successfully</p>
+              <p className="text-xs text-text-secondary font-mono mt-0.5">ID: {successRunId}</p>
             </div>
           </div>
           <button
             onClick={() => onRunCreated(successRunId)}
-            className="flex items-center gap-1.5 px-3 py-1 bg-telemetry-emerald hover:bg-telemetry-emeraldLight text-surface-lowest text-xs font-mono font-semibold rounded-[3px] transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-accent hover:bg-accent-light text-text-inverse text-sm font-medium transition-colors shrink-0"
           >
-            <span>Analyze Drift</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            Compare <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
+      {/* Error */}
       {errorMsg && (
-        <div className="p-3.5 rounded-[4px] bg-telemetry-rose/10 border border-telemetry-rose/30 text-telemetry-roseLight flex items-center gap-2.5 text-xs font-mono">
-          <AlertCircle className="w-4 h-4 text-telemetry-rose shrink-0" />
-          <span>{errorMsg}</span>
+        <div className="flex items-center gap-3 p-4 rounded-lg bg-status-redDim border border-status-red/25">
+          <AlertCircle className="w-5 h-5 text-status-red shrink-0" />
+          <p className="text-sm text-status-red">{errorMsg}</p>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-surface-low border border-border-subtle rounded-[4px] p-5 space-y-5">
-        {/* Model and Run Type */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-[11px] font-mono font-semibold text-slate-400 uppercase mb-2">
-              Model Adapter Backend
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setModel('mock')}
-                className={`p-2.5 rounded-[3px] border text-left transition-colors cursor-pointer ${
-                  model === 'mock'
-                    ? 'bg-telemetry-emerald/10 border-telemetry-emerald text-slate-100'
-                    : 'bg-surface-lowest border-border-subtle text-slate-400 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs font-mono">Mock Adapter</span>
-                  <Sparkles className="w-3 h-3 text-telemetry-emerald" />
-                </div>
-                <p className="text-[10px] text-slate-500 font-sans">Distribution sampler (No GPU needed)</p>
-              </button>
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="bg-bg-card border border-border-base rounded-lg divide-y divide-border-muted">
 
-              <button
-                type="button"
-                onClick={() => setModel('llama3:8b')}
-                className={`p-2.5 rounded-[3px] border text-left transition-colors cursor-pointer ${
-                  model !== 'mock'
-                    ? 'bg-telemetry-emerald/10 border-telemetry-emerald text-slate-100'
-                    : 'bg-surface-lowest border-border-subtle text-slate-400 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-xs font-mono">Ollama Local</span>
-                  <Cpu className="w-3 h-3 text-telemetry-emerald" />
-                </div>
-                <p className="text-[10px] text-slate-500 font-sans">llama3:8b via localhost:11434</p>
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-mono font-semibold text-slate-400 uppercase mb-2">
-              Run Role & Classification
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setRunType('baseline')}
-                className={`p-2.5 rounded-[3px] border text-left transition-colors cursor-pointer ${
-                  runType === 'baseline'
-                    ? 'bg-telemetry-indigo/15 border-telemetry-indigo text-slate-100'
-                    : 'bg-surface-lowest border-border-subtle text-slate-400 hover:border-slate-700'
-                }`}
-              >
-                <span className="font-bold text-xs font-mono block">Baseline (Control)</span>
-                <p className="text-[10px] text-slate-500 font-sans mt-0.5">Reference benchmark state</p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setRunType('candidate')}
-                className={`p-2.5 rounded-[3px] border text-left transition-colors cursor-pointer ${
-                  runType === 'candidate'
-                    ? 'bg-telemetry-violet/15 border-telemetry-violet text-slate-100'
-                    : 'bg-surface-lowest border-border-subtle text-slate-400 hover:border-slate-700'
-                }`}
-              >
-                <span className="font-bold text-xs font-mono block">Candidate (Treatment)</span>
-                <p className="text-[10px] text-slate-500 font-sans mt-0.5">Updated weights or prompt state</p>
-              </button>
-            </div>
+        {/* Model backend */}
+        <div className="p-5">
+          <label className="block text-sm font-semibold text-text-primary mb-3">Model backend</label>
+          <div className="grid grid-cols-2 gap-3">
+            <ToggleCard
+              active={model === 'mock'}
+              onClick={() => setModel('mock')}
+              title="Mock (Demo)"
+              description="Generates synthetic data — no GPU needed"
+            />
+            <ToggleCard
+              active={model === 'llama3:8b'}
+              onClick={() => setModel('llama3:8b')}
+              title="Ollama (Local)"
+              description="Runs llama3:8b via localhost:11434"
+            />
           </div>
         </div>
 
-        {/* Repetitions per prompt */}
-        <div className="pt-3 border-t border-border-subtle">
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-[11px] font-mono font-semibold text-slate-400 uppercase flex items-center gap-1.5">
-              <Sliders className="w-3.5 h-3.5 text-telemetry-emerald" />
-              Repeats per Prompt ($k$): <span className="text-slate-100 font-bold font-mono">{repeats} repeats</span>
-            </label>
-            <span className="text-[10px] text-slate-500 font-mono">Within-prompt noise estimation</span>
+        {/* Run type */}
+        <div className="p-5">
+          <label className="block text-sm font-semibold text-text-primary mb-1">Run type</label>
+          <p className="text-xs text-text-muted mb-3">
+            Baseline = your original model. Candidate = the modified/compressed version.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <ToggleCard
+              active={runType === 'baseline'}
+              onClick={() => setRunType('baseline')}
+              title="Baseline"
+              description="The original, unmodified model"
+              color="blue"
+            />
+            <ToggleCard
+              active={runType === 'candidate'}
+              onClick={() => setRunType('candidate')}
+              title="Candidate"
+              description="The modified or compressed model"
+              color="purple"
+            />
+          </div>
+        </div>
+
+        {/* Repeats */}
+        <div className="p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <label className="text-sm font-semibold text-text-primary">Repeats per prompt</label>
+              <p className="text-xs text-text-muted mt-0.5">
+                Each prompt is run this many times to measure natural variance.
+              </p>
+            </div>
+            <span className="text-lg font-semibold text-text-primary font-mono w-8 text-right">{repeats}</span>
           </div>
           <input
-            type="range"
-            min="2"
-            max="10"
-            step="1"
+            type="range" min="2" max="10" step="1"
             value={repeats}
             onChange={(e) => setRepeats(parseInt(e.target.value, 10))}
-            className="w-full accent-telemetry-emerald cursor-pointer"
+            className="w-full accent-accent cursor-pointer"
           />
-          <div className="flex justify-between text-[10px] font-mono text-slate-500 mt-1">
-            <span>2 (Fast)</span>
-            <span>3 (Standard Default)</span>
-            <span>5 (Recommended for High Risk)</span>
-            <span>10 (Exhaustive)</span>
+          <div className="flex justify-between text-xs text-text-muted mt-1">
+            <span>2 – Fast</span>
+            <span>3 – Minimum (medium risk)</span>
+            <span>5 – More repeats</span>
+            <span>10 – More sampling</span>
           </div>
         </div>
 
-        {/* Evaluation Metrics Checklist */}
-        <div className="pt-3 border-t border-border-subtle">
-          <label className="block text-[11px] font-mono font-semibold text-slate-400 uppercase mb-2">
-            Evaluation Metrics to Compute
-          </label>
+        {/* Metrics */}
+        <div className="p-5">
+          <label className="block text-sm font-semibold text-text-primary mb-1">Evaluation metrics</label>
+          <p className="text-xs text-text-muted mb-3">Select which quality metrics to compute for each output.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {availableMetrics.map((m) => {
+            {AVAILABLE_METRICS.map((m) => {
               const active = selectedMetrics.includes(m.id);
               return (
-                <div
+                <label
                   key={m.id}
-                  onClick={() => toggleMetric(m.id)}
-                  className={`p-2.5 rounded-[3px] border flex items-start gap-2.5 cursor-pointer transition-colors ${
+                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                     active
-                      ? 'bg-telemetry-emerald/10 border-telemetry-emerald/40 text-slate-200'
-                      : 'bg-surface-lowest border-border-subtle text-slate-500 hover:border-slate-700'
+                      ? 'bg-accent-dim border-accent-border'
+                      : 'bg-bg-page border-border-base hover:border-border-focus'
                   }`}
                 >
                   <input
                     type="checkbox"
                     checked={active}
-                    onChange={() => {}}
-                    className="mt-0.5 rounded-[2px] border-slate-700 text-telemetry-emerald focus:ring-0"
+                    onChange={() => toggleMetric(m.id)}
+                    className="mt-0.5 accent-accent cursor-pointer"
                   />
                   <div>
-                    <span className="text-xs font-mono font-semibold text-slate-200 block">{m.name}</span>
-                    <span className="text-[10px] text-slate-400 font-sans block mt-0.5">{m.desc}</span>
+                    <p className="text-sm font-medium text-text-primary">{m.name}</p>
+                    <p className="text-xs text-text-secondary mt-0.5">{m.desc}</p>
                   </div>
-                </div>
+                </label>
               );
             })}
           </div>
         </div>
 
-        {/* Action Button */}
-        <div className="pt-4 border-t border-border-subtle flex items-center justify-end">
+        {/* Submit */}
+        <div className="p-5 flex justify-end">
           <button
             type="submit"
             disabled={loading}
-            className="flex items-center gap-2 px-5 py-2 bg-telemetry-emerald hover:bg-telemetry-emeraldLight text-surface-lowest text-xs font-mono font-semibold rounded-[4px] shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-light text-text-inverse text-sm font-medium rounded transition-colors disabled:opacity-50"
           >
-            {loading ? (
-              <span>Running Benchmark Sweep...</span>
-            ) : (
-              <>
-                <PlayCircle className="w-4 h-4" />
-                <span>Launch Benchmark Sweep</span>
-              </>
-            )}
+            <PlayCircle className="w-4 h-4" />
+            {loading ? 'Running…' : 'Start Benchmark'}
           </button>
         </div>
       </form>
     </div>
   );
 };
+
+// ─── Helper ──────────────────────────────────────────────────────────────────
+
+function ToggleCard({
+  active, onClick, title, description, color = 'green',
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  description: string;
+  color?: 'green' | 'blue' | 'purple';
+}) {
+  const activeClass = {
+    green:  'bg-accent-dim border-accent-border',
+    blue:   'bg-status-blueDim border-status-blue/30',
+    purple: 'bg-status-purpleDim border-status-purple/30',
+  }[color];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`p-3 rounded-lg border text-left transition-colors ${
+        active ? activeClass : 'bg-bg-page border-border-base hover:border-border-focus'
+      }`}
+    >
+      <p className="text-sm font-semibold text-text-primary">{title}</p>
+      <p className="text-xs text-text-secondary mt-0.5">{description}</p>
+    </button>
+  );
+}
