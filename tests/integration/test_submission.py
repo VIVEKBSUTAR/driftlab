@@ -41,6 +41,7 @@ def test_dataset_json_jsonl_and_invalid_inputs(tmp_path):
         assert len(load_dataset(p)) == 10
     with pytest.raises(ValueError, match="does not exist"):
         load_dataset(tmp_path/"missing.json")
+    p = tmp_path / "duplicate-tasks.json"
     p.write_text(json.dumps([data[0], data[0]]))
     with pytest.raises(ValueError, match="unique"):
         load_dataset(p)

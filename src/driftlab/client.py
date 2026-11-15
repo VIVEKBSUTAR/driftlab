@@ -78,7 +78,7 @@ class DriftLab:
         manifest = {"schema_version": 1, "run_id": run_id, "model": desc, "dataset_digest": dataset_hash,
                     "tasks": [asdict(t) for t in task_items], "metrics": metrics, "repeats": repeats,
                     "seed": seed, "generation": generation.model_dump(), "synthetic": model == "mock",
-                    "run_type": run_type}
+                    "run_type": run_type, "environment": {"driftlab":"0.1.0", "numpy":np.__version__}}
         path = Path(jsonl_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.with_suffix(".manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -140,6 +140,8 @@ class DriftLab:
             jsonl_path=r.jsonl_path, created_at=r.created_at.isoformat(), completed_at=r.completed_at.isoformat() if r.completed_at else None,
             observations_count=progress, expected_observations=len(manifest.get("tasks", []))*manifest.get("repeats", 0),
             dataset_digest=r.dataset_version.digest if r.dataset_version else None, synthetic=manifest.get("synthetic", False),
+            model_digest=r.model_snapshot.digest, model_provenance=manifest.get("model", {}),
+            generation=manifest.get("generation", {}), seed=manifest.get("seed"), metrics=manifest.get("metrics", []),
             error=error_path.read_text() if error_path and error_path.exists() else None)
 
     def get_run(self, run_id):

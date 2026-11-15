@@ -121,7 +121,7 @@ Lack of statistical significance does not prove equivalence. A significant impro
 
 Per-run artifacts under `data/runs/`:
 
-- `<run_id>.manifest.json`: tasks, model metadata, dataset digest, generation configuration, metrics, seed, repeats, role, synthetic flag.
+- `<run_id>.manifest.json`: tasks, model metadata, dataset digest, generation configuration, metrics, seed, repeats, role, synthetic flag, and DriftLab/NumPy environment versions.
 - `<run_id>.jsonl`: raw observations, append-only in the application path.
 - `<run_id>.jsonl.scores.jsonl`: raw fields plus computed scores.
 - `<run_id>.error.txt`: error detail when a run fails.
@@ -137,7 +137,7 @@ Raw JSONL is the output source of truth; relational rows support queries and com
 | GET `/` | Health and version |
 | GET `/catalog` | Tasks, metric registry, policy defaults, suite description |
 | GET `/models` | Local Ollama availability and model list |
-| GET `/runs` | Run metadata and progress from saved raw observations |
+| GET `/runs` | Run metadata, model provenance/digest, generation settings, and progress from saved raw observations |
 | POST `/runs` | Validate/prepare/execute a run; optional local background task |
 | GET `/runs/{id}` | Model details, aggregates, observations, scores, failure details |
 | POST `/compare` | Compute and persist evidence |

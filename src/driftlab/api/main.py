@@ -165,8 +165,8 @@ def get_comparison(comparison_id: str, db_url: str = DEFAULT_DB_URL):
 def report(comparison_id: str, db_url: str = DEFAULT_DB_URL):
     result = get_comparison(comparison_id, db_url)
     text = format_drift_markdown_report([DriftVerdict(**v) for v in result["verdicts"]],
-        baseline_info={"identifier":result["baseline"]["model_identifier"],"digest":result["baseline"].get("dataset_digest")},
-        candidate_info={"identifier":result["candidate"]["model_identifier"],"digest":result["candidate"].get("dataset_digest")})
+        baseline_info={"identifier":result["baseline"]["model_identifier"],"digest":result["baseline"].get("model_digest")},
+        candidate_info={"identifier":result["candidate"]["model_identifier"],"digest":result["candidate"].get("model_digest")})
     text += f"\n## Reproducibility\n\nComparison: `{result['id']}`\n\nConfiguration: `{result['config']}`\n\nSynthetic: {result['baseline']['synthetic'] or result['candidate']['synthetic']}\n"
     return PlainTextResponse(text, headers={"Content-Disposition":f'attachment; filename="{comparison_id}.md"'})
 
