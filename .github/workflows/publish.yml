@@ -20,7 +20,7 @@ jobs:
       - run: npm ci --prefix frontend && npm test --prefix frontend
       - run: uv run --frozen --extra dev python scripts/build_release.py
       - run: uv run --frozen --extra dev python scripts/verify_release.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: distributions
           path: |
