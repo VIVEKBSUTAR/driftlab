@@ -4,7 +4,7 @@ Discuss substantial API, statistical or storage changes in an issue before imple
 
 ## Development
 
-Use Python 3.11–3.14 and Node 22.12+ (supported major versions 22/24/26). Create a virtual environment, install `.[dev]`, and run `npm ci --prefix frontend`. For a locked environment with uv installed, use `uv sync --locked --extra dev`; the core deployment export is `requirements.lock`. The optional embedding extra is separate and can require large model downloads.
+Use Python 3.11–3.14 and Node 22.22.2+, 24.15+, or 26.x. Create a virtual environment, install `.[dev]`, and run `npm ci --prefix frontend`. For a locked environment with uv installed, use `uv sync --locked --extra dev`; the core deployment export is `requirements.lock`. The optional embedding extra is separate and can require large model downloads.
 
 ```bash
 venv/bin/ruff check src tests scripts examples

@@ -19,7 +19,7 @@ The supported deployment is **one trusted team, one workspace, one host, one ser
 
 ## Getting started
 
-Requirements: Python **3.11–3.14**, Node **22.12+** (22, 24, or 26) for building the dashboard, and npm. Ollama and downloaded model weights are needed only for real inference.
+Requirements: Python **3.11–3.14**, Node **22.22.2+, 24.15+, or 26.x** for building the dashboard, and npm. Ollama and downloaded model weights are needed only for real inference.
 
 ```bash
 git clone https://github.com/VIVEKBSUTAR/driftlab.git

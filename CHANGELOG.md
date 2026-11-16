@@ -18,7 +18,7 @@ Production-oriented single-workspace release. This is not a multi-tenant or high
 
 - HTTP `POST /runs` returns **202** and a queued `run_id`; poll for completion before comparing. Synchronous HTTP execution is removed. SDK/CLI calls remain synchronous.
 - HTTP database URLs and filesystem output paths are rejected. Infrastructure is operator configured.
-- Python support is 3.11–3.14. Frontend builds require Node 22.12+ in supported majors 22/24/26.
+- Python support is 3.11–3.14. Frontend builds require Node 22.22.2+, 24.15+, or 26.x.
 - Generation seeds use a 63-bit NumPy SeedSequence scheme. v0.1 runs remain readable but exact historical replay requires their recorded prior revision.
 - `/docs` and `/redoc` are disabled; authenticated `/openapi.json` provides the contract without external CDN dependencies.
 - Repeated identical prompt/system contexts are rejected to prevent inflated prompt sample counts.
