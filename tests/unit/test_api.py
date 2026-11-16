@@ -1,99 +1,60 @@
-"""
-Unit tests for the DriftLab FastAPI endpoints.
-"""
-
-from pathlib import Path
-from fastapi.testclient import TestClient
-import pytest
-
-from driftlab.api.main import app
-
-client = TestClient(app)
+"""The public API queues work and never accepts infrastructure from callers."""
 
 
-def test_root_endpoint():
-    res = client.get("/")
-    assert res.status_code == 200
-    data = res.json()
-    assert data["status"] == "healthy"
-    assert data["service"] == "driftlab"
+def test_health_and_readiness(api):
+    client, app = api
+    assert client.get("/").json()["service"] == "driftlab"
+    assert client.get("/api/readyz").json()["worker"] == "disabled"
+    assert client.get("/api/workspace").json()["runs"] == 0
 
 
-def test_trigger_and_query_run(tmp_path: Path):
-    db_file = tmp_path / "api_test.db"
-    db_url = f"sqlite:///{db_file}"
-
-    # 1. Trigger baseline run
-    payload_base = {
+def test_run_and_compare(api):
+    client, app = api
+    options = {
         "model": "mock",
-        "run_type": "baseline",
-        "repeats": 2,
-        "metrics": ["exact_match"],
+        "repeats": 3,
         "tasks": [
             {
-                "id": "t1",
-                "task_key": "t1",
-                "category": "logic",
-                "risk_level": "medium",
-                "prompt": "What is 2+2?",
-                "expected_output": "4",
+                "id": f"t{i}",
+                "task_key": f"t{i}",
+                "prompt": f"What is {i}+1?",
+                "expected_output": str(i + 1),
             }
+            for i in range(10)
         ],
-        "db_url": db_url,
     }
-    res_base = client.post("/runs", json=payload_base)
-    assert res_base.status_code == 200
-    base_data = res_base.json()
-    assert base_data["status"] == "success"
-    base_run_id = base_data["run_id"]
+    b = client.post("/api/runs", json=options)
+    assert b.status_code == 202
+    b_id = b.json()["run_id"]
+    assert client.get(f"/api/runs/{b_id}").json()["status"] == "pending"
+    assert app.state.queue.run_once()
+    c = client.post("/api/runs", json={**options, "run_type": "candidate"})
+    c_id = c.json()["run_id"]
+    assert app.state.queue.run_once()
+    assert len(client.get("/api/runs").json()) == 2
+    detail = client.get(f"/api/runs/{b_id}").json()
+    assert detail["observations_count"] == 30
+    assert "jsonl_path" not in detail
+    response = client.post(
+        "/api/compare",
+        json={
+            "baseline_run_id": b_id,
+            "candidate_run_id": c_id,
+            "n_resamples": 100,
+            "n_permutations": 100,
+        },
+    )
+    assert response.status_code == 200
+    result = response.json()
+    assert client.get(f"/api/comparisons/{result['id']}/report").status_code == 200
+    raw = client.get(f"/api/runs/{b_id}/artifacts/raw")
+    assert raw.status_code == 200 and len(raw.text.splitlines()) == 30
 
-    # 2. Trigger candidate run
-    payload_cand = {
-        "model": "mock",
-        "run_type": "candidate",
-        "repeats": 2,
-        "metrics": ["exact_match"],
-        "tasks": [
-            {
-                "id": "t1",
-                "task_key": "t1",
-                "category": "logic",
-                "risk_level": "medium",
-                "prompt": "What is 2+2?",
-                "expected_output": "4",
-            }
-        ],
-        "db_url": db_url,
-    }
-    res_cand = client.post("/runs", json=payload_cand)
-    assert res_cand.status_code == 200
-    cand_data = res_cand.json()
-    cand_run_id = cand_data["run_id"]
 
-    # 3. List runs
-    res_list = client.get(f"/runs?db_url={db_url}")
-    assert res_list.status_code == 200
-    runs = res_list.json()
-    assert len(runs) == 2
-
-    # 4. Get run details
-    res_get = client.get(f"/runs/{base_run_id}?db_url={db_url}")
-    assert res_get.status_code == 200
-    detail = res_get.json()
-    assert detail["id"] == base_run_id
-    assert detail["observations_count"] == 2
-
-    # 5. Compare runs
-    compare_payload = {
-        "baseline_run_id": base_run_id,
-        "candidate_run_id": cand_run_id,
-        "db_url": db_url,
-        "noise_floor": 0.01,
-        "seed": 42,
-    }
-    res_compare = client.post("/compare", json=compare_payload)
-    assert res_compare.status_code == 200
-    comp_data = res_compare.json()
-    assert comp_data["baseline_run_id"] == base_run_id
-    assert len(comp_data["verdicts"]) > 0
-    assert "status" in comp_data["verdicts"][0]
+def test_infrastructure_is_not_an_api_parameter(api):
+    client, _ = api
+    assert client.post("/api/runs", json={"db_url": "sqlite:////tmp/other.db"}).status_code == 422
+    assert client.get("/api/runs?db_url=sqlite://").status_code == 422
+    assert client.post("/api/runs", json={"background": False}).status_code == 422
+    assert client.get("/api/runs/missing").status_code == 404
+    assert client.get("/api/runs?limit=1001").status_code == 422

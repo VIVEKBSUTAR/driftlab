@@ -11,10 +11,10 @@ Implements the formal decision hierarchy for determining behavioral drift:
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, Literal
 import numpy as np
 
-from driftlab.risk.policy import RiskPolicyConfig, get_risk_policy
+from driftlab.risk.policy import RiskPolicyConfig
 from driftlab.stats.core import bootstrap_ci, permutation_test, equivalence_check
 
 DriftStatus = Literal[
@@ -30,6 +30,7 @@ DriftStatus = Literal[
 @dataclass
 class DriftVerdict:
     """Encapsulates the statistical evidence, risk thresholds, and final drift decision."""
+
     status: DriftStatus
     category: str
     metric_id: str
@@ -86,8 +87,7 @@ def evaluate_drift(
 
     # Rule 2: High risk regression
     is_harmful = (
-        (estimate < -margin) if risk_policy.harmful_direction == "negative"
-        else (estimate > margin)
+        (estimate < -margin) if risk_policy.harmful_direction == "negative" else (estimate > margin)
     )
     if risk_level in ("high", "critical") and is_significant and is_harmful:
         return DriftVerdict(
@@ -190,9 +190,13 @@ def compare_runs_for_drift(
     """
     common_prompts = sorted(set(baseline_scores.keys()).intersection(candidate_scores.keys()))
     n_prompts = len(common_prompts)
-    
+
     # Calculate repeats count
-    n_repeats = min(min(len(baseline_scores[p]), len(candidate_scores[p])) for p in common_prompts) if common_prompts else 0
+    n_repeats = (
+        min(min(len(baseline_scores[p]), len(candidate_scores[p])) for p in common_prompts)
+        if common_prompts
+        else 0
+    )
 
     for scores in (baseline_scores, candidate_scores):
         for values in scores.values():
@@ -214,10 +218,10 @@ def compare_runs_for_drift(
         )
 
     # Compute per-prompt mean differences (candidate - baseline)
-    prompt_diffs = np.array([
-        np.mean(candidate_scores[p]) - np.mean(baseline_scores[p])
-        for p in common_prompts
-    ], dtype=float)
+    prompt_diffs = np.array(
+        [np.mean(candidate_scores[p]) - np.mean(baseline_scores[p]) for p in common_prompts],
+        dtype=float,
+    )
 
     # Bootstrap confidence interval on clustered differences
     est, ci_low, ci_high = bootstrap_ci(
@@ -251,5 +255,11 @@ def compare_runs_for_drift(
     )
 
     verdict.p_value = p_val
-    verdict.details = {"n_prompts": n_prompts, "n_repeats": n_repeats, "alpha": risk_policy.alpha, "confidence_level": 1-risk_policy.alpha, "bootstrap": "BCa; point interval for constant prompt differences"}
+    verdict.details = {
+        "n_prompts": n_prompts,
+        "n_repeats": n_repeats,
+        "alpha": risk_policy.alpha,
+        "confidence_level": 1 - risk_policy.alpha,
+        "bootstrap": "BCa; point interval for constant prompt differences",
+    }
     return verdict

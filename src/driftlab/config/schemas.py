@@ -1,4 +1,5 @@
 """Validated generation settings shared by package, CLI, and API."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

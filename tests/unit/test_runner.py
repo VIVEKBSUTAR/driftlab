@@ -14,7 +14,6 @@ from driftlab.store import (
     Run,
     Task,
     ModelSnapshot,
-    Observation,
     MetricResult,
     PromptAggregate,
     read_observation_records,

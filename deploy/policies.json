@@ -1,0 +1,38 @@
+[
+  {
+    "name": "low_risk_default",
+    "risk_level": "low",
+    "margin": 0.08,
+    "alpha": 0.05,
+    "min_prompts": 5,
+    "min_repeats": 3,
+    "harmful_direction": "negative"
+  },
+  {
+    "name": "medium_risk_default",
+    "risk_level": "medium",
+    "margin": 0.05,
+    "alpha": 0.05,
+    "min_prompts": 10,
+    "min_repeats": 3,
+    "harmful_direction": "negative"
+  },
+  {
+    "name": "high_risk_default",
+    "risk_level": "high",
+    "margin": 0.03,
+    "alpha": 0.01,
+    "min_prompts": 20,
+    "min_repeats": 5,
+    "harmful_direction": "negative"
+  },
+  {
+    "name": "critical_risk_default",
+    "risk_level": "critical",
+    "margin": 0.015,
+    "alpha": 0.005,
+    "min_prompts": 30,
+    "min_repeats": 5,
+    "harmful_direction": "negative"
+  }
+]

@@ -3,8 +3,9 @@ Provides the ModelAdapter abstract base class for model inference.
 """
 
 from abc import ABC, abstractmethod
-from typing import TypedDict, Optional
+from typing import TypedDict
 from driftlab.config.schemas import GenerationConfig
+
 
 class GenerationResult(TypedDict):
     text: str
@@ -13,6 +14,7 @@ class GenerationResult(TypedDict):
     completion_tokens: int
     latency_ms: float
 
+
 class ModelDescription(TypedDict):
     family: str
     identifier: str
@@ -20,9 +22,12 @@ class ModelDescription(TypedDict):
     quantization: str
     backend_version: str
 
+
 class ModelAdapter(ABC):
     @abstractmethod
-    def generate(self, prompt: str, system_prompt: str, config: GenerationConfig) -> GenerationResult:
+    def generate(
+        self, prompt: str, system_prompt: str, config: GenerationConfig
+    ) -> GenerationResult:
         """Generates a response from the model."""
         pass
 

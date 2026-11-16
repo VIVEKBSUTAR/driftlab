@@ -4,16 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "driftlab"
-version = "0.1.0"
+version = "0.2.0"
 description = "Reproducible, risk-aware statistical evaluation of LLM behavioral drift."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.15"
 license = "MIT"
 classifiers = ["Programming Language :: Python :: 3", "Topic :: Scientific/Engineering :: Artificial Intelligence"]
 dependencies = [
   "fastapi>=0.100,<1", "sqlalchemy>=2,<3", "pydantic>=2,<3",
   "numpy>=1.24,<3", "scipy>=1.10,<2", "statsmodels>=0.14,<1",
-  "typer>=0.9,<1", "requests>=2.31,<3", "uvicorn>=0.20,<1"
+  "typer>=0.9,<1", "requests>=2.31,<3", "uvicorn>=0.20,<1", "filelock>=3.16,<5"
 ]
 
 [project.scripts]
@@ -21,7 +21,7 @@ driftlab = "driftlab.cli.main:app"
 
 [project.optional-dependencies]
 embeddings = ["sentence-transformers>=2.2,<7"]
-dev = ["pytest>=7,<10", "httpx>=0.24,<1", "setuptools>=77"]
+dev = ["pytest>=7,<10", "httpx>=0.24,<1", "setuptools>=77", "ruff>=0.9,<1", "pip-audit>=2.9,<3", "pip>=25.3,<27"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -32,3 +32,13 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["embeddings: requires optional embedding dependencies and cached model weights"]
+
+[project.urls]
+Repository = "https://github.com/VIVEKBSUTAR/driftlab"
+Issues = "https://github.com/VIVEKBSUTAR/driftlab/issues"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

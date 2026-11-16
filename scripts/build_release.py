@@ -3,11 +3,14 @@
 Run with the project's Python environment: python scripts/build_release.py
 Requires setuptools >=77; Node/npm are needed only to build the frontend.
 """
+
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
+import hashlib
+import tomllib
 
 root = Path(__file__).resolve().parents[1]
 subprocess.run(["npm", "run", "build", "--prefix", str(root / "frontend")], check=True)
@@ -15,15 +18,58 @@ release = root / "dist"
 release.mkdir(exist_ok=True)
 with tempfile.TemporaryDirectory(prefix="driftlab-release-") as directory:
     staging = Path(directory)
-    shutil.copytree(root / "src", staging / "src", ignore=shutil.ignore_patterns("__pycache__", "*.egg-info"))
-    shutil.copytree(root / "frontend" / "dist", staging / "src" / "driftlab" / "api" / "static", dirs_exist_ok=True)
-    for name in ("pyproject.toml", "README.md", "LICENSE", "decisions.md", "instructions.md"):
+    shutil.copytree(
+        root / "src", staging / "src", ignore=shutil.ignore_patterns("__pycache__", "*.egg-info")
+    )
+    shutil.copytree(
+        root / "frontend" / "dist",
+        staging / "src" / "driftlab" / "api" / "static",
+        dirs_exist_ok=True,
+    )
+    for name in (
+        "pyproject.toml",
+        "README.md",
+        "LICENSE",
+        "decisions.md",
+        "instructions.md",
+        "SECURITY.md",
+        "CONTRIBUTING.md",
+        "CHANGELOG.md",
+        "Dockerfile",
+        "compose.yaml",
+        "requirements.lock",
+        "uv.lock",
+        ".env.example",
+        ".dockerignore",
+    ):
         shutil.copy2(root / name, staging / name)
-    for name in ("docs", "examples", "scripts", "tests"):
+    for name in ("docs", "examples", "scripts", "tests", "deploy", ".github"):
         shutil.copytree(root / name, staging / name, ignore=shutil.ignore_patterns("__pycache__"))
-    shutil.copytree(root / "frontend", staging / "frontend", ignore=shutil.ignore_patterns("node_modules", "dist"))
-    (staging / "MANIFEST.in").write_text("recursive-include src/driftlab/api/static *\nrecursive-include docs *\nrecursive-include examples *\nrecursive-include scripts *\nrecursive-include tests *\nrecursive-include frontend *\ninclude decisions.md instructions.md\n")
-    subprocess.run([sys.executable, "-c", "from setuptools.build_meta import build_wheel, build_sdist; import sys; output=sys.argv[1]; build_wheel(output); build_sdist(output)", str(release)], cwd=staging, check=True)
-assert list(release.glob("*.whl")), "Wheel was not created"
-assert list(release.glob("*.tar.gz")), "Source archive was not created"
+    shutil.copytree(
+        root / "frontend",
+        staging / "frontend",
+        ignore=shutil.ignore_patterns("node_modules", "dist"),
+    )
+    (staging / "MANIFEST.in").write_text(
+        "recursive-include src/driftlab/api/static *\nrecursive-include docs *\nrecursive-include examples *\nrecursive-include scripts *\nrecursive-include tests *\nrecursive-include frontend *\nrecursive-include deploy *\nrecursive-include .github *\ninclude decisions.md instructions.md SECURITY.md CONTRIBUTING.md CHANGELOG.md Dockerfile compose.yaml requirements.lock uv.lock .env.example .dockerignore\n"
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from setuptools.build_meta import build_wheel, build_sdist; import sys; output=sys.argv[1]; build_wheel(output); build_sdist(output)",
+            str(release),
+        ],
+        cwd=staging,
+        check=True,
+    )
+version = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
+artifacts = [
+    release / f"driftlab-{version}-py3-none-any.whl",
+    release / f"driftlab-{version}.tar.gz",
+]
+assert all(path.exists() for path in artifacts), "Release artifact missing"
+(release / "SHA256SUMS").write_text(
+    "".join(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n" for p in artifacts)
+)
 print(f"Release artifacts: {release}")

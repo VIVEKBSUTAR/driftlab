@@ -11,7 +11,6 @@ Matches the minimal schema specification:
 
 from datetime import datetime, timezone
 import uuid
-from typing import Any, Dict, Optional
 from sqlalchemy import (
     Column,
     String,
@@ -21,7 +20,6 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     JSON,
-    Index,
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -99,7 +97,9 @@ class Run(Base):
     model_snapshot_id = Column(String, ForeignKey("model_snapshots.id"), nullable=False)
     dataset_version_id = Column(String, ForeignKey("dataset_versions.id"), nullable=True)
     run_type = Column(String, nullable=False, default="baseline")  # baseline or candidate
-    status = Column(String, nullable=False, default="pending")  # pending, running, completed, failed
+    status = Column(
+        String, nullable=False, default="pending"
+    )  # pending, running, completed, failed
     jsonl_path = Column(String, nullable=True)
     created_at = Column(DateTime, default=utcnow, nullable=False)
     completed_at = Column(DateTime, nullable=True)
@@ -122,10 +122,15 @@ class Observation(Base):
     raw_output = Column(Text, nullable=False)
     latency_ms = Column(Float, nullable=False)
     error = Column(Text, nullable=True)
+    finish_reason = Column(String, nullable=True)
+    prompt_tokens = Column(Integer, nullable=True)
+    completion_tokens = Column(Integer, nullable=True)
 
     run = relationship("Run", back_populates="observations")
     task = relationship("Task", back_populates="observations")
-    metric_results = relationship("MetricResult", back_populates="observation", cascade="all, delete-orphan")
+    metric_results = relationship(
+        "MetricResult", back_populates="observation", cascade="all, delete-orphan"
+    )
 
 
 class MetricResult(Base):
@@ -201,9 +206,25 @@ class DriftResult(Base):
 
 class Comparison(Base):
     """Complete immutable comparison evidence and reproducibility configuration."""
+
     __tablename__ = "comparisons"
     id = Column(String, primary_key=True, default=generate_uuid)
     baseline_run_id = Column(String, ForeignKey("runs.id"), nullable=False)
     candidate_run_id = Column(String, ForeignKey("runs.id"), nullable=False)
     result = Column(JSON, nullable=False)
     created_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+class RunJob(Base):
+    """Durable, local queue entry; payload contains JSON configuration, never executable objects."""
+
+    __tablename__ = "run_jobs"
+    run_id = Column(String, ForeignKey("runs.id"), primary_key=True)
+    payload = Column(JSON, nullable=False)
+    status = Column(String, nullable=False, default="queued", index=True)
+    cancel_requested = Column(Integer, nullable=False, default=0)
+    attempts = Column(Integer, nullable=False, default=0)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)

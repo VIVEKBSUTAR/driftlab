@@ -4,7 +4,6 @@ Unit tests for driftlab.fingerprint.
 
 from driftlab.fingerprint import (
     hash_content,
-    hash_object,
     hash_dataset,
     hash_model,
     hash_config,
@@ -33,7 +32,13 @@ def test_hash_dataset_determinism():
     assert hash_dataset(tasks_a) == hash_dataset(tasks_b)
 
     tasks_modified = [
-        {"id": "1", "task_key": "k1", "prompt": "P1 modified", "category": "catA", "risk_level": "low"},
+        {
+            "id": "1",
+            "task_key": "k1",
+            "prompt": "P1 modified",
+            "category": "catA",
+            "risk_level": "low",
+        },
         {"id": "2", "task_key": "k2", "prompt": "P2", "category": "catB", "risk_level": "high"},
     ]
     assert hash_dataset(tasks_a) != hash_dataset(tasks_modified)

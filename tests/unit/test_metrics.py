@@ -46,28 +46,28 @@ def test_json_validity():
     markdown_json = 'Here is the JSON:\n```json\n{"status": "ok"}\n```'
     assert json_validity(markdown_json, required_keys=["status"]) == 1.0
 
-    invalid_json = 'not a json string'
+    invalid_json = "not a json string"
     assert json_validity(invalid_json) == 0.0
 
 
 @pytest.mark.embeddings
 def test_embedding_similarity():
-    pytest.importorskip("sentence_transformers", reason="Install driftlab[embeddings] for semantic scoring tests")
+    pytest.importorskip(
+        "sentence_transformers", reason="Install driftlab[embeddings] for semantic scoring tests"
+    )
     # Exact match strings should have similarity 1.0
     sim_same = embedding_similarity("The quick brown fox", "The quick brown fox")
     assert pytest.approx(sim_same, abs=1e-3) == 1.0
 
     # Semantically close sentences should have high similarity
     sim_close = embedding_similarity(
-        "A small boy is playing with a dog.",
-        "A young child plays with a puppy."
+        "A small boy is playing with a dog.", "A young child plays with a puppy."
     )
     assert sim_close > 0.6
 
     # Semantically unrelated sentences should have lower similarity
     sim_far = embedding_similarity(
-        "A small boy is playing with a dog.",
-        "Quantum mechanics describes microscopic particles."
+        "A small boy is playing with a dog.", "Quantum mechanics describes microscopic particles."
     )
     assert sim_far < sim_close
 
@@ -88,6 +88,19 @@ def test_benchmark_answer_matching():
     assert compute_metric("answer_match", "#### 1,200.00", "1200", answer_type="numeric") == 1
     assert compute_metric("answer_match", "No number here", "4", answer_type="numeric") == 0
     assert compute_metric("answer_match", "#### 5", "4", answer_type="numeric") == 0
-    assert compute_metric("answer_match", "No, the passage disagrees.", "no", answer_type="boolean") == 1
+    assert (
+        compute_metric("answer_match", "No, the passage disagrees.", "no", answer_type="boolean")
+        == 1
+    )
     assert compute_metric("answer_match", "Yes.", "no", answer_type="boolean") == 0
     assert compute_metric("answer_match", "It might be yes", "yes", answer_type="boolean") == 0
+
+
+def test_json_validity_rejects_non_json_numbers():
+    assert compute_metric("json_validity", '{"value": NaN}') == 0
+    assert compute_metric("json_validity", "Infinity") == 0
+
+
+def test_numeric_answer_scoring_handles_decimal_and_scientific_notation():
+    assert compute_metric("answer_match", "#### 1e3", "1000", answer_type="numeric") == 1
+    assert compute_metric("answer_match", "#### .5", "0.5", answer_type="numeric") == 1

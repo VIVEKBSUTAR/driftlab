@@ -16,17 +16,21 @@ def get_engine(db_url: str = DEFAULT_DB_URL, echo: bool = False) -> Engine:
     """Creates a SQLAlchemy engine, with SQLite foreign key enforcement enabled."""
     connect_args = {}
     if db_url.startswith("sqlite"):
-        connect_args = {"check_same_thread": False}
-    
+        connect_args = {"check_same_thread": False, "timeout": 30}
+
     engine = create_engine(db_url, echo=echo, connect_args=connect_args)
-    
+
     # Enable foreign keys for SQLite
     if db_url.startswith("sqlite"):
         from sqlalchemy import event
+
         @event.listens_for(engine, "connect")
         def set_sqlite_pragma(dbapi_connection, connection_record):
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=FULL")
             cursor.close()
 
     return engine

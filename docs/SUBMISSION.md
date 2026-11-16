@@ -24,11 +24,12 @@
 
 ```bash
 venv/bin/python -m pytest tests/
+npm test --prefix frontend
 npm run build --prefix frontend
 venv/bin/python scripts/build_release.py
 ```
 
-Install `dist/driftlab-0.1.0-py3-none-any.whl` in a clean environment and verify imports, `driftlab version`, a baseline/candidate comparison, and the `/app/` route outside the source checkout. Keep artifacts out of Git; deliver the wheel/archive and experiment evidence alongside the report.
+Install `dist/driftlab-0.2.0-py3-none-any.whl` in a clean environment and verify imports, `driftlab version`, a baseline/candidate comparison, and the `/app/` route outside the source checkout. Keep artifacts out of Git; deliver the wheel/archive and experiment evidence alongside the report.
 
 ## Scope compared with the synopsis
 

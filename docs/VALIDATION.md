@@ -48,3 +48,13 @@ venv/bin/python scripts/export_study_report.py data/study/STUDY_FILE.json
 ```
 
 The current workspace's study summary is `data/study/study-20261115T161203Z.json`, with its review report exported to `dist/study-report.md`. Seeds and files aid reproducibility, but inference can still vary with model/runtime/hardware revisions.
+
+## Version 0.2 engineering verification — 16 November 2026
+
+The current production-oriented release passed **73 Python tests**, including the cached optional embedding test, and **8 frontend tests** locally. Ruff, TypeScript/Vite, the installed-wheel workflow and bundled-asset checks passed. The core Python lock and npm dependency tree had no known advisories at the time of the audit; optional embedding dependencies are outside the minimal runtime audit.
+
+A disposable copy of the v0.1 workspace upgraded successfully, retaining **10 runs, 1,540 observations and 5 comparisons**. These totals include synthetic functional runs and are not the size of the real-model study. The upgraded local API/dashboard was checked in a browser, including version, actual counts and recorded real-model output inspection. The original workspace was backed up before migration.
+
+The release adds tests for authenticated sessions/bearer access, host/origin and body limits, queue admission, restart/resume without duplicated generations, cancellation, one-worker ownership, backup/restore corruption handling, schema compatibility, policy snapshots, provenance and mid-run model identity changes. Local Docker verification requires a running daemon; this computer has the client but no running daemon, so container build/execution and restart checks run in GitHub Actions. Remote results should be read from the workflow for the reviewed commit.
+
+Historical pilot results above belong to v0.1 (source revision `e630017fd32a487384d435e0d7448a6df9a92a6b`). Version 0.2 records a new generation seed scheme. The commands above reproduce the experimental design under the current implementation; use the historical source and recorded model/runtime state when reproducing that specific table. Engineering verification does not establish domain safety, general model equivalence or a guarantee of error-free operation.

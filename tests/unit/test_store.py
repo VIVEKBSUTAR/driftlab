@@ -2,12 +2,9 @@
 Unit tests for driftlab.store (SQLAlchemy models and append-only JSONL persistence).
 """
 
-import os
-import json
 import pytest
 from pathlib import Path
 from driftlab.store import (
-    Base,
     Experiment,
     ModelSnapshot,
     DatasetVersion,

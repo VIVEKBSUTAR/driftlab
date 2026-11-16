@@ -38,7 +38,11 @@ htmlcov/
 
 # Local databases and run artifacts
 *.db
+*.db-wal
+*.db-shm
 *.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
 data/runs/
 
 # Frontend dependencies and bundles
@@ -57,3 +61,19 @@ data/benchmarks/
 study-workspace/
 example-workspace/
 data/study/
+
+# Private deployment configuration and workstation metadata
+.env
+.env.*
+!.env.example
+secrets/
+backups/
+.DS_Store
+.schema.lock
+.execution.lock
+.enqueue.lock
+.worker.lock
+.venv/
+.ruff_cache/
+frontend/coverage/
+*.restore.lock

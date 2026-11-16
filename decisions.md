@@ -1,221 +1,95 @@
-# DriftLab — project architecture and decisions
+# DriftLab architecture and decisions
 
-Last reviewed: 15 November 2026. This is the maintained reference for the current source code. Update it alongside changes to behavior, architecture, storage, statistical assumptions, setup, or the UI. The former `decision.md` now points here.
+Last reviewed: 16 November 2026. This document describes version 0.2.0. Update it alongside changes to architecture, behavior, metrics, storage, dependencies or workflows.
 
-## Purpose and scope
+## Purpose and supported scope
 
-DriftLab evaluates whether a candidate local language model behaves differently from a baseline on the same prompts. Candidate changes can include quantization, fine-tuning, prompts, generation settings, or model versions. It separates statistical evidence, practical effect size, and risk policy rather than treating every significant p-value as a deployment regression.
+DriftLab compares baseline and candidate model behavior on identical application tasks. It records repeated generations, scores outputs and reports statistical evidence against practical risk policies. A recommendation informs human review; the tool does not approve or block a deployment itself.
 
-The application runs locally through a Python library, Typer CLI, FastAPI service, and React dashboard. It is an evaluation tool, not a model trainer, hosted inference provider, or automated deployment system. A `block` recommendation is evidence for a human or external gate; DriftLab itself does not block deployments.
+The supported operational unit is one shared, authenticated workspace on one host, local disk and SQLite, one API process and one worker. This is not a multi-tenant SaaS, distributed job system, general code sandbox or high-availability database. API users share full workspace privileges. SDK/CLI and custom adapters are trusted local interfaces.
 
-## Technology stack
+## Stack and code ownership
 
-| Layer | Technology and responsibility |
+| Layer | Choice |
 | --- | --- |
-| Language/runtime | Python >=3.11; TypeScript and React 18 |
-| Backend | FastAPI, Pydantic 2 validation, Uvicorn ASGI server |
-| Application service | `driftlab.client.DriftLab`, shared by library, API, and CLI |
-| Inference | Requests-based Ollama adapter; seeded synthetic Mock adapter |
-| Statistics | NumPy generators and arrays, SciPy bootstrap/permutation operations, statsmodels multiple-testing correction |
-| Evaluation | Python text/JSON metrics; sentence-transformers for optional semantic scoring |
-| Persistence | SQLAlchemy 2 with local SQLite; raw JSONL and JSON sidecars on disk |
-| Frontend | React, Vite 5, TypeScript 5, Tailwind CSS 3, lucide-react icons |
-| Visualization | Responsive SVG and CSS charts; no additional charting dependency |
-| Packaging | setuptools / pyproject.toml; `driftlab` console entry point |
-| Verification | pytest unit/calibration/integration tests; `tsc` plus Vite production build |
+| Runtime | Python 3.11–3.14; React 18 and TypeScript |
+| Service | `client.DriftLab`, shared by SDK, CLI and HTTP |
+| HTTP | FastAPI/Pydantic 2/Uvicorn, explicit app factory/lifespan |
+| Inference | Local Ollama over Requests; custom Python adapters; explicit synthetic adapter |
+| Analysis | NumPy, SciPy, statsmodels; pure numerical functions in `stats/core.py` |
+| State | SQLAlchemy 2, SQLite WAL/FULL synchronous, foreign keys and busy timeout |
+| Evidence | Raw JSONL, scored sidecars, atomic task/config manifests, SQLite observation/aggregate/comparison rows |
+| Jobs | SQLite job payloads/status, local file locks and one worker thread |
+| UI | React, Vite 8, Tailwind 3, lucide icons, SVG/CSS charts |
+| Verification | pytest, Ruff, Vitest/Testing Library, TypeScript build, wheel/container smoke checks |
+| Release | setuptools wheel/sdist with compiled dashboard; nonroot Docker image and optional Caddy TLS proxy |
 
-Python and frontend dependency ranges are declared in `pyproject.toml` and `frontend/package.json`; the npm lockfile captures the frontend resolution. The current frontend uses a system-font stack with numeric monospace styling.
+`config/settings.py` owns operator settings; `config/schemas.py` generation settings; `datasets/loader.py` validates tasks; `adapters/` owns inference identity/generation; `runner/` records and scores; `store/` handles persistence/upgrades; `client.py` manages run and comparison lifecycles; `jobs.py` owns queued recovery/cancellation. `api/main.py` is transport and admission control; `api/security.py` handles HTTP guards; `maintenance.py` manages backup/restore. The frontend's mounted views are composed in `App.tsx`; unused prototypes with sample data were removed.
 
-## Code map and ownership of logic
+## HTTP and security boundary
 
-- `config/schemas.py`: validated shared generation settings.
-- `datasets/loader.py`: JSON/JSONL task loading, validation, original built-in functional suite.
-- `adapters/`: unified `describe`/`generate` interface, Mock and Ollama implementations.
-- `runner/core.py`: prompt/repeat execution, immediate raw logging, metric scoring, aggregation, database synchronization.
-- `metrics/functions.py`: named scoring functions and registry.
-- `stats/core.py`: numerical functions independent of HTTP and database layers.
-- `risk/policy.py`: frozen risk policy defaults and lookup.
-- `drift/decision.py`: statistical comparison of prompt scores and ordered verdict rules.
-- `fingerprint/hashing.py`: content hashes for reproducible identities.
-- `store/`: ORM models, sessions, append-only output and observation ingestion.
-- `client.py`: run lifecycle, artifact manifests, compatibility checks, persisted comparison evidence.
-- `api/main.py`: REST validation, local background execution, report downloads, dashboard serving.
-- `cli/main.py`: run, compare, serve, and version commands using the same service.
-- `reporting/`: terminal, Markdown, and JSON formatting helpers.
-- `frontend/src/`: application navigation, typed API client, analytics, benchmark studio, run history, and comparisons.
+Infrastructure is selected by the operator at startup. Requests cannot supply a database URL, artifact path, arbitrary inference endpoint or server policy file. Local mode without a key allows only loopback clients; the CLI refuses non-loopback binding without server mode. Server mode requires a 32–256-character key and secure cookies, explicit hosts/origins and an HTTPS reverse proxy.
 
-## Backend pipeline
+Bearer keys and HMAC-signed, expiring session cookies grant shared workspace access. Browser keys remain transient React state and are cleared after login, never browser storage. Cookies are HttpOnly/SameSite=Strict and secure in server mode. Key rotation invalidates all sessions; logout clears the current cookie but is not server-side token revocation. No individual account/RBAC system is claimed.
 
-### 1. Validate and prepare
+Middleware validates hosts, origins and JSON content types, bounds content-length and streamed request bodies, supplies request IDs/CSP/security headers, and limits login/API requests in bounded process-local windows. The API limits tasks, observations, token budget, queued jobs and resampling; a semaphore allows one comparison at a time. Requests from a reverse proxy can share its IP-based rate bucket unless the operator safely configures trusted forwarding. Static assets and liveness are public; evidence and OpenAPI are protected. Logs omit bodies, query strings, keys and cookies; operator-only stack traces can still contain backend diagnostics.
 
-`DriftLab.prepare_run` accepts model, baseline/candidate role, repeats (1–100), registered metrics, tasks, generation settings, seed, and synthetic profile. Metrics must be nonempty, registered, and unique. Reference-dependent metrics require `expected_output` on every task.
+The API never silently falls back to sample data. Discovery errors are reported. Swagger/Redoc are disabled to avoid external CDN requirements and CSP exceptions; `/openapi.json` is the contract, exported to `docs/openapi.json` and checked by CI. Typed response models exclude internal artifact paths. Known run IDs and artifact kinds drive confined downloads. Lists use bounded limit/offset; observations have a default 200/max1000 page and total count.
 
-Datasets accept a JSON array or JSONL objects. Tasks contain `id`, `task_key`, category, risk tier, prompt, optional system prompt, reference, and output specification. Task IDs and keys must be unique within a dataset. Task identity is content-derived when runs are prepared; dataset digests use sorted validated records. Changing prompt content or scoring context changes identity.
+## Run preparation and identity
 
-The bundled suite contains 32 original functional prompts: 12 medium-risk arithmetic prompts and 20 high-risk structured-output prompts. It exercises the pipeline; it is not a published benchmark, broad knowledge test, or safety certification.
+Tasks require unique IDs, keys and prompt/system contexts; nonblank bounded prompt/reference text; valid risk tiers and structured output specifications. Reference metrics require references. The original 32-prompt functional suite exercises arithmetic/JSON handling, not benchmark coverage or safety. User datasets and prepared GSM8K/BoolQ samples share the validation pipeline.
 
-Default generation settings: temperature 0.7, top_p 1.0, max_tokens 256, timeout 60 seconds. Supported fields also include seed and stop sequences. Pydantic rejects unknown fields and validates bounds.
+A task ID derives from full scoring context, including system prompt, reference and output specification. Dataset hashes derive from sorted validated task records. Model identity includes full backend digest and metadata. Ollama names are canonicalized; missing digests fail preparation. Redirects are refused by the adapter. Model identity is verified at submission, worker claim and after execution; changed identity fails rather than combining provenance under a successful run.
 
-For `mock`, the service uses reference outputs with seeded success probability 0.95 (`stable`) or 0.45 (`regression`). Other model names use Ollama at `http://localhost:11434`. Ollama metadata includes family, identifier, full digest, and quantization. The complete digest is retained for identity; display shortening must not change stored identity.
+Manifests record tasks, dataset hash, model identity, metrics, repeats, generation parameters, root seed and environment version. Schema 2 uses deterministic 63-bit NumPy SeedSequence seeds per task/repeat. Version 0.1 used different seed derivation; historical evidence is not relabeled or claimed exactly reproducible under v0.2. Synthetic stable/regression profiles use a per-generation generator, including after resume. Custom adapters retain their supplied identity; built-in `mock` is always labeled synthetic.
 
-Preparation allocates a unique run ID, writes a manifest, stores/reuses model and dataset records, and creates a pending run. Existing output paths are rejected to preserve evidence.
+## Execution, durability and recovery
 
-### 2. Execute and record
+HTTP POST `/runs` returns 202 and a real queued run ID after run/job rows commit together. SDK/CLI runs are synchronous. Admission/worker/execution locks prevent competing local ownership. Inference does not hold a database transaction open. The runner records raw output immediately, then scores it; it records errors before failing. Raw evidence includes text, latency, seed, available token counts and finish reason. Scores must be finite. Failed output is not scored as a zero or promoted into a completed run.
 
-Lifecycle: `pending → running → completed`, or `failed` on execution/scoring errors. Each prompt executes sequentially for the requested repeats. The runner derives repeat seeds as `seed_base + task_index * 1000 + repeat_index` and records the actual seed. External backends and hardware can still introduce nondeterminism.
+The worker recovers interrupted running jobs into the queue, verifies model identity and reuses cached generations by run/task/repeat/seed. A partial trailing raw write is quarantined before truncation. Complete malformed records fail closed. Unique database indexes prevent duplicate observations, scores and aggregates; model/dataset digest indexes prevent duplicate identities. Cached outputs can be rescored on resume; sidecar duplication is avoided.
 
-For every generation, the runner writes raw output, task ID, repeat index, seed, latency, and errors to JSONL **before scoring**. It computes all selected metrics, rejects nonfinite scores, and appends a scored sidecar record. Prompt aggregates contain mean, sample standard deviation, and repeat count. Successful runs synchronize observations, individual metric results, and aggregates to SQLite.
+Cancellation and shutdown are cooperative between generations; outstanding backend requests may take their timeout to finish. Shutdown waits up to 130 seconds, and readiness fails if the worker dies. Failed backend jobs are not automatically retried. Worker state and raw evidence allow resumption after abrupt termination, but do not eliminate hardware loss or make arbitrary custom metrics interruptible. Disk capacity and evidence retention remain operator responsibilities.
 
-Generation failures are recorded as observations and then stop the run. The service marks failure, ingests available raw evidence, and writes an error sidecar. No failed run is silently replaced with synthetic success. During API startup, pending/running records are marked failed because in-process background jobs cannot survive restarts.
+Manifests use private temporary files, fsync and atomic replace; JSONL appends are flushed/fsynced. This improves crash behavior, not cryptographic integrity or a guarantee against every filesystem/power-loss failure. SQLite and artifacts together constitute evidence; copying only the database or reingesting only raw JSONL is not full recovery.
 
-### 3. Compare compatible runs
+Schema upgrades are additive and versioned under a lock. Version 1 adds uniqueness constraints/job tables; version 2 adds optional generation provenance columns. Newer schemas are refused. Duplicate historical rows cause an explicit migration failure rather than deletion. Back up before upgrades; downgrade requires restoring a compatible backup.
 
-A comparison requires distinct, completed runs in baseline/candidate order. Both must have matching category/metric/risk groups and identical prompt content identities within each group. Empty scores, generation errors, and incompatible prompt/metric coverage are rejected.
+## Comparisons and statistical meaning
 
-For each category × metric × risk hypothesis:
+Only completed runs with matching task/scoring content and full manifest metric/repeat coverage are compared. SQL queries load metric rows with deterministic ordering, avoiding per-observation score queries. Per-prompt mean candidate-minus-baseline effects get equal prompt weighting.
 
-1. Compute each prompt's mean candidate score minus mean baseline score. Average these differences with equal prompt weight.
-2. Bootstrap the prompt differences using SciPy BCa intervals, at confidence `1 − policy.alpha`. Constant differences produce a point interval; nonfinite BCa results fall back to percentile bootstrap.
-3. Obtain a two-sided permutation p-value by pooling and relabeling repeats **within each prompt**, preserving each run's repeat counts. The Monte Carlo correction is `(extreme + 1) / (permutations + 1)`.
-4. Unless overridden, estimate the noise floor from the 95th percentile of absolute differences between two repeat-resampled baseline means, conditional on the observed prompts.
-5. Apply Holm correction across all category/metric/risk hypotheses in this comparison and evaluate the final policy rules again with adjusted p-values.
-6. Save the complete comparison, selected run records, verdicts, reproducibility settings, and recommendation.
+The interval is a BCa bootstrap across prompt differences, with explicit degenerate/constant fallbacks. The two-sided permutation test shuffles baseline/candidate labels within each prompt. Holm correction spans category × metric × risk hypotheses in that comparison. The default noise floor is the 95th percentile of absolute average differences from independent resamples of baseline repeats, conditional on the observed prompts. A finite nonnegative manual override is supported and recorded.
 
-Default service resampling counts are 2,000 bootstrap samples and 2,000 permutations; API bounds are 100–50,000. Default comparison seed is 42. The statistical utilities also expose Benjamini–Hochberg, power simulation, and an intentionally naive Mann–Whitney comparator; these are not the production decision path.
+Rules are ordered: insufficient prompt/repeat count; high/critical harmful significant regression beyond margin; meaningful significant drift; significant low-impact change; interval entirely inside the equivalence margin; otherwise inconclusive. Significance also requires effect beyond the noise floor. Effective policy settings, resampling settings, seeds, raw/adjusted p-values, intervals, counts and noise source are preserved with evidence. Policy validation requires all four risk tiers. Defaults are illustrative, not application-specific safety thresholds.
 
-## Metrics and interpretation
+Confidence levels follow each policy. The permutation resolution, prompt independence, dataset representativeness and grading quality constrain conclusions. Nonsignificance is not equivalence. `answer_match` uses explicit numeric/Boolean extraction (numeric final answer, preferring text after `####`; Boolean first yes/no/true/false token); it does not measure reasoning quality. JSON parsing rejects nonfinite pseudo-JSON. Optional sentence-transformers scoring requires separately provisioned dependencies and weights; its model revision is not currently fingerprinted, so pin/cache it externally for controlled studies.
 
-| Metric | Definition | Scale |
-| --- | --- | --- |
-| exact_match | Strips surrounding whitespace and compares text case-insensitively by default | 0 or 1 |
-| contains | Reference substring occurs in output, case-insensitive by default | 0 or 1 |
-| sequence_similarity | Python difflib SequenceMatcher character ratio; not edit distance | 0 to 1 |
-| json_validity | Parseable JSON, optional required top-level keys; accepts fenced JSON | 0 or 1 |
-| embedding_similarity | Cosine similarity using cached all-MiniLM-L6-v2 embeddings | −1 to 1 |
+## Frontend behavior
 
-Higher is better for these metrics under current policies. JSON validity does not prove semantic correctness or full JSON Schema compliance. Exact text matching can penalize correct paraphrases and alternate JSON formatting. Embedding scoring may need an initial model download and has materially different resource requirements from text metrics. It is deliberately not selected by default in the studio.
+An access gate checks the actual session before loading protected data. Offline/API failures expose a retry/error state and no fake metrics. Session expiry returns to authentication. The same-origin API client has timeouts, credentials and request-ID error reporting. The synthetic walkthrough awaits queued completion before requesting comparison; failed/cancelled jobs stop the workflow.
 
-## Risk policies and verdict hierarchy
+The dashboard shows database-wide totals from `/workspace`, recent API-backed history, per-metric quality and latency, run inspection, comparison forest plots, studio task/model configuration, datasets, policies and methodology. Aggregate quality is the equal-weight mean of prompt means; unrelated metrics are not blended into one score. Latency is in milliseconds and synthetic latency is labeled. Graphs expose units, empty states, legends and accessible descriptions. Forest domains include interval, effect, noise and margin without clipping; confidence labels follow risk tiers.
 
-| Tier | Practical margin ±δ | Alpha | Confidence | Minimum prompts per group | Minimum repeats |
-| --- | --- | --- | --- | --- | --- |
-| Low | 0.08 | 0.05 | 95% | 5 | 3 |
-| Medium | 0.05 | 0.05 | 95% | 10 | 3 |
-| High | 0.03 | 0.01 | 99% | 20 | 5 |
-| Critical | 0.015 | 0.005 | 99.5% | 30 | 5 |
+Run detail identifies partial observation pages; UI exports say visible page and full raw/score links are available. API limit/offset supports full external pagination; the current dashboard shows a bounded recent history rather than a virtualized large-workspace explorer. Cancellation controls report actual backend outcomes. Token-limit finish reasons produce a warning. Sample-size previews come from current catalog policies, while final analysis always uses backend policy logic.
 
-Minimums apply within each comparison group, not to the total number of observations. The minimum repeat count across matched prompts is used. Defaults treat negative effects as harmful. Python policy lookup falls back to medium for unknown strings; validated datasets restrict tiers to the four known values.
+## Deployment, release and maintenance
 
-The ordered rules are:
+Docker stages frontend compilation and wheel construction, then installs hash-pinned core dependencies into Python 3.13-slim. Runtime UID10001, read-only root, persistent workspace, dropped capabilities and resource bounds are supported by Compose. The optional proxy provides HTTPS. Environment/secret delivery, DNS, TLS, base-image updates, access controls, monitoring, retention, backend provisioning and capacity planning remain deployment responsibilities.
 
-1. `insufficient_data`: group prompt or repeat count is below policy minimum.
-2. `high_risk_regression`: high/critical tier, adjusted p < alpha, absolute effect > noise floor, harmful change beyond margin.
-3. `meaningful_drift`: significance/noise conditions pass and absolute effect > margin.
-4. `statistically_detected_low_impact`: significance/noise conditions pass but effect remains within margin.
-5. `no_meaningful_drift`: entire interval lies within ±margin.
-6. `insufficient_evidence`: all remaining cases.
+Backups acquire the execution lock, snapshot SQLite online and include artifacts, datasets/study files and effective policies. They normalize local artifact paths for relocation and reject external artifacts/symlinks. Restore rejects unsafe/archive-bomb paths, verifies checksums/size and database integrity, then renames into a new destination. Secrets, runtime dependencies and weights are excluded. Operators stop admission for operational snapshots and test restores in isolation. Checksums are not signatures.
 
-Lack of statistical significance does not prove equivalence. A significant improvement can be meaningful drift without being harmful. Overall recommendation is `block` for high-risk regression, `review` for other unresolved/material verdicts, and `within_policy` when every verdict is equivalent or low-impact. Recommendations do not establish general deployment safety.
+`uv.lock` records Python resolutions, including optional extras; `requirements.lock` exports hash-pinned core runtime dependencies. npm has its own lockfile. Optional embeddings are excluded from minimal deployment/audit and require separate review. Frontend advisory fixes include Vite8/Vitest5 and transitive updates. The frontend test suite covers real request/session/job-failure behavior. Python tests cover statistics, SDK/CLI/API, migration guards, security, queue recovery, cancellation and backup restore.
 
-## Storage and recovery boundaries
+`scripts/build_release.py` stages bundled UI and builds wheel/sdist/checksums. The source archive includes source, docs, tests, deployment/workflow files and locks. `verify_release.py` installs the wheel outside the checkout and checks its assets and persisted synthetic workflow. CI tests Python3.11/3.13/3.14, frontend behavior/build/advisories, core Python advisories, schema/lock consistency, release installation, and authenticated container execution/restart. Optional embedding tests need provisioned caches. A manual OIDC publication workflow requires an owned PyPI name and configured protected `pypi` environment; ordinary pushes do not publish.
 
-Per-run artifacts under `data/runs/`:
+## Research evidence and remaining limits
 
-- `<run_id>.manifest.json`: tasks, model metadata, dataset digest, generation configuration, metrics, seed, repeats, role, synthetic flag, and DriftLab/NumPy environment versions.
-- `<run_id>.jsonl`: raw observations, append-only in the application path.
-- `<run_id>.jsonl.scores.jsonl`: raw fields plus computed scores.
-- `<run_id>.error.txt`: error detail when a run fails.
+The v0.1 pilot used Qwen2.5 0.5B and SmolLM2 360M through local Ollama on Apple M4, 30 prompts each from GSM8K and BoolQ, five repeats and a 128-token cap. Six real runs produced 900 generations. Three comparisons were inconclusive; one GSM8K comparison met its equivalence margin at very low absolute accuracy. See `docs/VALIDATION.md` and its recorded revision. Model/data licenses and exact samples are documented; raw weights/evidence remain ignored local artifacts.
 
-SQLite stores ModelSnapshot, DatasetVersion, Task, Run, Observation, MetricResult, PromptAggregate, StatisticalTest, DriftResult, and Comparison. Experiment and RiskPolicy tables exist as foundations; defaults currently come from Python policies, and no experiment/policy editing workflow is exposed by the active dashboard.
+Production engineering checks do not validate generalizability, domain safety, statistical power for a particular application or all model families. Remaining platform boundaries include individual identities/authorization, distributed jobs, HA, external retention/monitoring and fingerprinting optional embedding model revisions. The supported release does not claim those features. Do not describe protocol plans as completed experiments or promise zero bugs.
 
-Raw JSONL is the output source of truth; relational rows support queries and comparisons. Writes flush after each observation but do not call `fsync`, so power-loss durability is not guaranteed. Append-only usage is not cryptographic tamper protection. The ingestion utility restores raw observations idempotently by run/task/repeat identity; it is not a complete database reconstruction tool for manifests, metrics, or comparisons. Back up SQLite and all sidecars together. No automated migration framework is present: `create_all` creates missing tables but does not migrate existing columns.
+## Repository synchronization
 
-## API and execution model
-
-| Endpoint | Responsibility |
-| --- | --- |
-| GET `/` | Health and version |
-| GET `/catalog` | Tasks, metric registry, policy defaults, suite description |
-| GET `/models` | Local Ollama availability and model list |
-| GET `/runs` | Run metadata, model provenance/digest, generation settings, and progress from saved raw observations |
-| POST `/runs` | Validate/prepare/execute a run; optional local background task |
-| GET `/runs/{id}` | Model details, aggregates, observations, scores, failure details |
-| POST `/compare` | Compute and persist evidence |
-| GET `/comparisons` | Saved comparison history, newest first |
-| GET `/comparisons/{id}` | Full saved comparison |
-| GET `/comparisons/{id}/report` | Download Markdown evidence |
-
-The same application routes are reachable under `/api`; OpenAPI/Swagger is at `/docs`. Errors map missing records to 404, validation failures to 422, unavailable evaluation dependencies/backends to 503, and unexpected failures to 500.
-
-The service uses local FastAPI BackgroundTasks when requested; the active studio submits background runs and polls details. There is no durable worker queue, multi-worker coordination, cancellation, or resume support. Prefer one local server process. `DRIFTLAB_WORKSPACE`, `DRIFTLAB_DB_URL`, and `DRIFTLAB_FRONTEND` configure workspace, database, and frontend directory. Default binding is loopback. API allows local Vite origins; it has no authentication or multi-tenant authorization. Model outputs, prompts, and local paths are available to API clients, and database URLs can be supplied by API callers. Do not expose this local development service publicly without redesigning these boundaries.
-
-## Frontend and visualization decisions
-
-`App.tsx` controls six views without a routing dependency; the shared `BenchmarkMetrics` component in `components/dashboard/Overview.tsx` supplies the analytics panels:
-
-- Overview: recorded run/model/observation/comparison counts, latest drift forest plot, synthetic walkthrough, recent run table, last 12 runs' observation volume, execution-status bars, completed-run quality selector, and mean/P95 latency.
-- Drift analysis: completed baseline/candidate selection, dataset mismatch feedback, explicit analysis, recommendation banner, forest plot, reproducibility record, expandable verdict evidence, JSON/Markdown export, and saved comparison history. The active UI uses estimated baseline noise; manual overrides remain available through the API and the older unmounted CompareView.
-- Run explorer: search, status filters, run details, output/reference inspection, per-repeat scores, latency, fingerprints, progress polling, and JSON export.
-- Benchmark studio: discovered or custom Ollama model identifiers, synthetic stable/regression profiles, baseline/candidate role, JSON/JSONL dataset import or editing, registered metrics, repeat count, seed, temperature, sample-size preview, and background run submission.
-- Datasets: searchable original functional prompts, references, risk tiers, and dataset download.
-- Methodology: explanation of the inference pipeline, risk-policy table, interpretation limits, and local installation guidance.
-
-The API client uses relative `/api` URLs and surfaces failures; it never substitutes fabricated runs, comparisons, or successful job IDs. The request layer supports `VITE_API_URL` or relative `/api`, uses a 180-second default timeout, and uses a 3-second health timeout. The active studio uses background submission and run-detail polling rather than holding a request open for all generations.
-
-Charts use the existing dark theme, restrained status colors, numeric typography, visible units, legends, accessible descriptions, and explicit empty/loading/error states. The volume chart exposes an underlying data table and hover titles. Run-quality bars show each metric independently, including a zero marker and −1 to 1 scale for embedding similarity. Mean quality is an equal-weight average of prompt means; there is no combined score across unrelated metrics. Latency excludes failed observations, uses milliseconds, and P95 uses nearest rank. Mock latency measures synthetic execution rather than LLM inference performance. Synthetic runs are labeled.
-
-Forest plots share a symmetric delta domain large enough for every interval, margin, estimate, and noise floor, with padding. They show green equivalence bands, gray noise bands, zero reference, interval caps, and point estimates without clipping. Confidence follows each risk tier rather than a universal 95% label. Analysis is explicitly requested so viewing the page does not create saved comparisons. Saved evidence identifies its own baseline and candidate IDs independently of the next comparison selection.
-
-Older separate view components (`CompareView`, `RunStudio`, `RunsList`, `RunDetailModal`, `IntervalChart`, `VerdictCard`, `PromptDiffExplorer`, `PoliciesView`, and common widgets) remain in the source tree; App currently mounts its composed views and the shared BenchmarkMetrics component. Sample data in inactive prototype components is not current dashboard functionality. No historical quality trend, token-throughput, inference cost, live streaming, or deployment integration is claimed without supporting data and UI wiring.
-
-## Local setup and workflows
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -e '.[dev]'
-npm ci --prefix frontend
-npm run build --prefix frontend
-driftlab serve
-```
-
-Open `http://127.0.0.1:8000/app/`. The API serves `frontend/dist` if available, otherwise packaged API static assets if present. Vite uses `/app/` as its base asset path. `python scripts/build_release.py` compiles the frontend, stages it under the API static package directory, and builds wheel/source artifacts under `dist/`. Direct Python-only builds do not run that frontend staging step; use the release script for distributable dashboard assets. The script includes README, license, docs, and examples. Install semantic scoring with `pip install -e '.[embeddings]'` when required; it is an optional extra.
-
-For frontend development run the API and `npm run dev --prefix frontend` in separate terminals. Vite on port 5173 proxies `/api` to backend port 8000. `vite preview` alone does not provide that development API proxy; use FastAPI to verify the integrated production build.
-
-```bash
-driftlab run --model mock --type baseline --repeats 5
-driftlab run --model mock --type candidate --repeats 5 --mock-profile regression
-driftlab compare BASELINE_ID CANDIDATE_ID --format json
-driftlab compare BASELINE_ID CANDIDATE_ID --format markdown --output report.md
-pytest tests/
-npm run build --prefix frontend
-```
-
-Use `--dataset path.jsonl` to supply real evaluation tasks, `--model` for an installed Ollama model, and `--seed`/`--temperature` for controlled settings. Python users can call `from driftlab import DriftLab`, create a workspace, run benchmarks, compare IDs, list records, and close the service. Keep the same dataset and metrics for both sides.
-
-## Verification, limitations, and next work
-
-Tests cover statistical calibration, drift rules, adapters, runner, storage, fingerprints, reporting, CLI/API, and persisted application-service workflows. Calibration is evidence about simulated conditions, not a guarantee for every deployment distribution. Seeded resampling enables repeatability with the same data and numerical stack; it does not guarantee identical output across different inference environments.
-
-Important open work: durable background jobs, cancellation, and resume; full database/artifact recovery and migrations; model/version provenance including embedding model revisions; production authentication and resource limits; pagination for large run/observation histories; continuous integration and hosted deployment hardening. The built-in suite and selected metrics must be expanded and validated for any real application domain.
-
-## Repository synchronization policy
-
-Keep local source and GitHub synchronized after completed, verified changes. Include the user's existing project changes when they explicitly request all changes, inspect the diff, run relevant checks, commit with a descriptive message, and push the current branch to its configured GitHub remote. Never force-push or discard unrelated work. Report push/authentication failures accurately. Generated dependencies, build bundles, virtual environments, databases, and run artifacts remain ignored; source and lockfiles belong in Git. Keep this document current in the same commit as behavioral or architectural changes. `AGENTS.md` preserves this project instruction for future work.
-
-## Submission implementation and validation (15 November 2026)
-
-The release workflow now builds both an installable wheel with dashboard assets and a source archive containing Python, frontend source, tests, scripts, docs, and examples. `scripts/verify_release.py` installs the wheel into an isolated target, verifies that imports resolve there rather than the editable checkout, checks packaged HTML/JavaScript routes, and executes a persisted synthetic experiment. It reuses the current environment's dependencies; it is not an independent dependency-resolution test. The build backend is setuptools >=77, including its wheel builder; semantic scoring remains optional.
-
-The frontend has six connected views and uses the same local API/database as the public package. Prepared GSM8K and BoolQ samples, when present under `data/benchmarks/`, appear in the dataset browser and studio with source metadata. Selecting either preselects `answer_match`; custom JSON/JSONL import remains available. Source datasets are downloaded explicitly by `scripts/prepare_benchmarks.py`, never silently during ordinary API requests.
-
-`answer_match` adds explicit benchmark answer extraction via `output_spec.answer_type`: numeric answers use Decimal and the final number (preferring text after `####`), Boolean answers use the first yes/no/true/false token. With no answer type, it uses normalized exact match. It measures answer agreement, not reasoning quality. Raw scoring failures still fail the run rather than becoming zero scores.
-
-The selected real-model pilot uses Qwen2.5 0.5B and SmolLM2 360M through local Ollama on Apple M4, two 30-prompt benchmark samples, five repeats, temperature 0.7, and a 128-token cap. Each dataset includes an independent-seed Qwen control and a cross-family comparison. The preparation script records source revision/hash, sample indices and seed, transformation, and licensing. The original BoolQ bucket returned 403; the script uses Google's official Hugging Face mirror in that case. See `docs/MODELS_AND_DATA.md` for attribution and the study design.
-
-Portable inference runtime/model files stay in ignored `.tools/` and `.runtime/` directories. The optional local launcher disables cloud inference. Study records live in the same SQLite store and raw artifact directory; full JSON summaries and Markdown exports remain local artifacts. This is a small exploratory pilot, not proof of broad generalizability, a deployment certification, or an estimate of false positive rate across many studies.
-
-GitHub Actions now defines offline core Python verification on Python 3.11/3.13 and a frontend/package build. Optional embedding tests require installed dependencies and cached/downloadable weights; the local full suite can exercise them separately. CI configuration is committed source; its remote execution must be checked independently after pushing.
-
-The completed pilot produced six real runs and 900 observations: three comparisons were inconclusive, and the GSM8K cross-family comparison met the configured margin despite low answer accuracy. All 52 Python tests passed locally, including optional embeddings; the production build and installed-wheel check passed. The measured pilot table and interpretation are maintained in `docs/VALIDATION.md`; exported full evidence remains in ignored local artifact directories.
+After verified requested changes, commit source and lockfiles and push the current branch to its configured GitHub remote. Never force push, discard work or commit databases, secrets, dependencies, generated builds, environments, weights or raw evaluations. Report push failures accurately. The project instructions are preserved in `AGENTS.md`.

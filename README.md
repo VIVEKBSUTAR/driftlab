@@ -1,12 +1,29 @@
 # DriftLab
 
-A Python package and local web application for **risk-aware statistical validation of LLM behavioral changes**. Compare a baseline with a candidate on identical prompts, repeat generations to observe variability, and inspect statistical evidence alongside practical margins.
+**Measure whether an LLM update changes the behavior your application depends on.**
 
-## Install and run
+DriftLab is a Python package, command-line tool, and web dashboard for repeatable, risk-aware LLM evaluation. It compares baseline and candidate outputs on the same tasks, separates sampling variability from behavioral change, and preserves the evidence behind each recommendation.
 
-Python 3.11+ is required. Node 18+ is needed only when building the dashboard from source.
+[Getting started](#getting-started) · [Deployment](docs/DEPLOYMENT.md) · [Operations](docs/OPERATIONS.md) · [API schema](docs/openapi.json) · [Validation](docs/VALIDATION.md) · [Security](SECURITY.md)
+
+## Capabilities
+
+- Run repeated evaluations through local Ollama models or a Python adapter.
+- Score reference answers, numeric answers, structured JSON, text similarity, and optional semantic similarity.
+- Compare prompt-level effects with bootstrap confidence intervals, permutation tests, Holm correction, and configurable risk margins.
+- Queue jobs durably, resume interrupted generations, cancel work, and retain partial failure evidence.
+- Inspect live API-backed metrics, individual outputs, model identities, token-limit warnings, and downloadable reports in the dashboard.
+- Operate one authenticated workspace with secure browser sessions, bearer-token API access, explicit resource limits, health probes, and consistent backups.
+
+The supported deployment is **one trusted team, one workspace, one host, one server process and one worker**, using local SQLite and local disk. Version 0.2.0 does not provide tenant isolation, per-user permissions, distributed workers, or a high-availability service. Read the [deployment boundaries](docs/DEPLOYMENT.md) before exposing it to a network.
+
+## Getting started
+
+Requirements: Python **3.11–3.14**, Node **22.12+** (22, 24, or 26) for building the dashboard, and npm. Ollama and downloaded model weights are needed only for real inference.
 
 ```bash
+git clone https://github.com/VIVEKBSUTAR/driftlab.git
+cd driftlab
 python3 -m venv venv
 source venv/bin/activate
 pip install -e '.[dev]'
@@ -15,98 +32,103 @@ npm run build --prefix frontend
 driftlab serve
 ```
 
-Open **http://127.0.0.1:8000/app/**. Interactive REST documentation is at **http://127.0.0.1:8000/docs**. The dashboard, API, and SQLite store use the same local workspace. For live frontend development, run `npm run dev --prefix frontend` and open its `/app/` URL while the API is running.
+Open [the dashboard](http://127.0.0.1:8000/app/). Local mode binds to loopback and is intended for your own computer. The workspace starts empty. The synthetic walkthrough executes two real, persisted evaluation jobs with an injected regression; its outputs are visibly labeled synthetic. Request failures never produce fabricated metrics.
 
-The workspace starts empty. **Run a synthetic walkthrough** creates two actual persisted runs and a statistical comparison with an injected regression. Synthetic results are labeled throughout; failed requests never become fabricated evidence.
+For frontend development, run `npm run dev --prefix frontend` alongside the API and open the Vite URL at `/app/`. The development proxy forwards `/api` to port 8000.
 
-### Install the submission package
+### Build an installable package
 
 ```bash
 python scripts/build_release.py
-pip install dist/driftlab-0.1.0-py3-none-any.whl
+python scripts/verify_release.py
+pip install dist/driftlab-0.2.0-py3-none-any.whl
 driftlab serve
 ```
 
-The release builder includes the compiled dashboard in the wheel and source archive. A checkout is not required to use the resulting wheel. Build outputs are ignored by Git. The distribution name is local: this project has not been published to PyPI.
+The wheel includes the compiled dashboard and runs without a checkout or Node. The source archive includes development and deployment files. SHA-256 checksums are generated in `dist/SHA256SUMS`. The package has **not been published to PyPI**; use a locally built wheel or source checkout. Public publication requires ownership of the distribution name and a configured release publisher.
 
 ## Python API
 
 ```python
 from driftlab import DriftLab
 
-lab = DriftLab('./my-experiment')
+lab = DriftLab("./experiment")
 try:
-    baseline = lab.run(model='mock', repeats=5, seed=42)
-    candidate = lab.run(model='mock', run_type='candidate', repeats=5,
-                        seed=91, mock_profile='regression')
+    baseline = lab.run(model="mock", repeats=5, seed=42)
+    candidate = lab.run(
+        model="mock", run_type="candidate", repeats=5,
+        seed=91, mock_profile="regression",
+    )
     evidence = lab.compare(baseline.run_id, candidate.run_id)
-    print(evidence['recommendation'])
-    print(evidence['verdicts'])
+    print(evidence["recommendation"])
+    print(evidence["verdicts"])
 finally:
     lab.close()
 ```
 
-For real inference, start Ollama and pull your chosen model. Replace `model='mock'` with its installed identifier. Supply validated tasks through `tasks=` or use `load_dataset` from `driftlab.datasets.loader`. The library accepts a custom adapter implementing `describe()` and `generate()`; see the abstract interface in `driftlab.adapters.base`.
+`mock` explicitly selects synthetic inference. For a real model, pull it into Ollama and use its installed name, for example `model="qwen2.5:0.5b"`. Supply application-specific tasks through `tasks=` and an operator-controlled Ollama endpoint through `ollama_url=`. Custom integrations implement [`ModelAdapter`](src/driftlab/adapters/base.py), including a stable model identifier and digest.
 
-Optional semantic scoring: `pip install -e '.[embeddings]'`. `embedding_similarity` may download model weights on first use; missing dependencies or scoring failures fail the run visibly. Text and JSON metrics work without embedding dependencies.
+The SDK and CLI are trusted local interfaces and execute runs synchronously. HTTP runs use the persistent background queue. The API server owns its workspace and inference endpoint; HTTP callers cannot supply database URLs or filesystem output paths.
 
-## Command line
+Optional semantic scoring: install `.[embeddings]` and provision the required embedding model before going offline. Model loading or scoring failures fail the job visibly. Optional embedding dependencies are outside the minimal container runtime and its core dependency audit.
+
+## CLI and datasets
 
 ```bash
 driftlab run --model mock --type baseline --seed 42
 driftlab run --model mock --type candidate --seed 91 --mock-profile regression
-driftlab compare BASELINE_ID CANDIDATE_ID --format json --output evidence.json
 driftlab compare BASELINE_ID CANDIDATE_ID --format markdown --output report.md
 ```
 
-Use `--dataset tasks.json` or `--dataset tasks.jsonl`, `--metrics exact_match,json_validity`, `--repeats 5`, and `--temperature 0.7`. Invalid or missing datasets fail explicitly.
-
-A JSON dataset is an array; JSONL uses one object per line:
+Use `--dataset tasks.jsonl`, `--metrics answer_match,json_validity`, `--repeats 5`, and `--temperature 0.7` as appropriate. Run CLI experiments from the desired workspace directory. JSON datasets contain an array; JSONL contains one object per line:
 
 ```json
 {"id":"sum_1","task_key":"sum_1","category":"arithmetic","risk_level":"medium","prompt":"Return only the integer: 2+2","expected_output":"4"}
 ```
 
-Supported task fields include optional `system_prompt` and `output_spec` with `required_keys`. IDs and task keys must be unique. Every reference-based metric requires an `expected_output`. Both comparison runs must use identical task content and metric coverage. A single prompt is useful for functional testing but cannot satisfy the default statistical sample policy.
+Tasks support `system_prompt` and an `output_spec` with `required_keys` or `answer_type`. IDs, task keys, and prompt/system contexts must be unique. Reference metrics require `expected_output`. Comparisons require identical task content and complete metric coverage. A single prompt tests functionality but cannot satisfy the default statistical sample policy.
 
-## What the analysis does
+Prepared benchmark JSONL files in `data/benchmarks/` appear in the dashboard. See [models and data](docs/MODELS_AND_DATA.md) and [the experiment protocol](docs/EXPERIMENTS.md) for reproducible GSM8K and BoolQ samples. Respect upstream dataset and model licenses.
 
-1. Generate repeated outputs for each task, recording raw output before scoring.
-2. Compute per-prompt mean candidate-minus-baseline scores, with equal prompt weighting.
-3. Estimate a BCa confidence interval across prompts and a two-sided within-prompt label-permutation p-value.
-4. Apply Holm correction across the category × metric × risk hypotheses.
-5. Compare effects with an estimated baseline-repeat noise floor and practical risk margins.
-6. Report high-risk regression, meaningful drift, detected low impact, equivalence, insufficient data, or inconclusive evidence.
+## Statistical interpretation
 
-Confidence levels follow the policy: 95% low/medium, 99% high, 99.5% critical. Minimum prompts/repeats are enforced **per group**. Default margins are illustrative, configurable Python policy choices, not validated safety standards. An insignificant test is not proof of equivalence. A `block` recommendation is a review signal; DriftLab does not control deployments.
+1. Generate multiple outputs per prompt and record each raw result before scoring.
+2. Compute candidate-minus-baseline score changes with equal weighting across prompts.
+3. Estimate a BCa bootstrap interval across prompts and a two-sided within-prompt label-permutation p-value.
+4. Apply Holm correction across category × metric × risk hypotheses.
+5. Assess statistical evidence against practical risk margins and estimated baseline-repeat variability.
 
-## Evidence and storage
+Outcomes distinguish meaningful drift, high-risk regression, low-impact change, equivalence, insufficient data, and inconclusive evidence. Confidence levels default to 95% for low/medium, 99% for high, and 99.5% for critical risk. Minimum prompt and repeat counts apply to each group. Policies can be configured in [`deploy/policies.json`](deploy/policies.json); the effective configuration is saved with comparisons.
 
-The workspace contains `driftlab.db` and `data/runs/`. Each run has a raw JSONL file, a configuration/task manifest, a scored JSONL sidecar, and an error file if it fails. Dataset and model snapshot hashes preserve identity. Comparisons and full verdicts are saved in SQLite and downloadable as JSON or Markdown. Back up both the database and artifact directory; raw ingestion alone is not complete database recovery. Append-only file usage is not cryptographic tamper protection.
+Default margins are illustrative choices, **not validated safety standards**. A nonsignificant result does not establish equivalence. A `block` recommendation is an input to human deployment review; DriftLab does not approve or control deployments. Independence assumptions, dataset coverage, grading validity, inference backend behavior, and sample size limit every conclusion.
 
-Background runs are local in-process jobs. Keep one server process running; after a restart, unfinished runs are marked failed and can be started again. The application is designed for a trusted local workspace and binds to loopback by default.
+## Deployment and evidence
 
-## Verification and submission
+For a network deployment, use the [Docker/TLS instructions](docs/DEPLOYMENT.md). Server mode requires a strong secret, secure cookies, explicit hosts and origins, persistent storage, and a private inference backend. The dashboard, API, database, and artifact downloads share the same workspace. List endpoints are bounded and paginated; the UI identifies recent history and partial output pages.
+
+The workspace contains SQLite state and `data/runs/` manifests, raw JSONL outputs, score sidecars, and failure records. Completed evidence includes model digests, generation settings, independent generation seeds, dataset hashes, metric values, finish reasons, and available token counts. Treat prompts, outputs, backups, and reports as sensitive. Hashes support identity and corruption detection; they do not provide tamper-proof auditing.
+
+Use `driftlab backup` and `driftlab restore` together with the [recovery runbook](docs/OPERATIONS.md). Back up before upgrading; schema upgrades are additive, and restoring a backup is the rollback path. Failed inference is not automatically retried; interrupted queued work resumes under the same identity and seed scheme.
+
+## Verification and research status
 
 ```bash
 venv/bin/python -m pytest tests/
+venv/bin/ruff check src tests scripts examples
+npm test --prefix frontend
 npm run build --prefix frontend
 python scripts/build_release.py
 python scripts/verify_release.py
 ```
 
+CI checks Python compatibility, frontend behavior, release installation, dependency advisories, and an authenticated container workflow. See [contributing](CONTRIBUTING.md) for locked installs and offline embedding tests.
+
+The bundled 32-prompt suite is an original functional smoke test. The historical **v0.1** local pilot evaluated Qwen2.5 0.5B and SmolLM2 360M on GSM8K/BoolQ samples: six runs, 900 generations, and four comparisons. Three were inconclusive; one met its configured equivalence margin at low absolute accuracy. This demonstrates the evaluation path, not broad model equivalence, clinical/financial safety, or generalizability. Version 0.2 changes generation seed derivation; reproduce historical results with their recorded v0.1 revision. [Validation and limitations](docs/VALIDATION.md) contain the evidence.
+
+## Project resources
+
 - [Architecture and decisions](decisions.md)
-- [Review demonstration and submission checklist](docs/SUBMISSION.md)
-- [Verification and pilot results](docs/VALIDATION.md)
-- [Selected models and datasets](docs/MODELS_AND_DATA.md)
-- [Real-model experiment protocol](docs/EXPERIMENTS.md)
-- [Python example](examples/evaluate.py)
-- [Real-model study runner](examples/local_model_study.py)
-
-The bundled 32-prompt suite is an original **functional smoke test**, not a published benchmark. Synthetic experiments establish pipeline behavior, not real-model performance or generalizability. Claims covering multiple local model families and benchmark datasets require the real-model experiments described in the study protocol.
-
-## Completed local pilot
-
-Qwen2.5 0.5B and SmolLM2 360M were tested on reproducibly sampled GSM8K and BoolQ tasks: six runs, 900 generations, two independent-seed controls and two cross-family comparisons. Three comparisons were inconclusive and one met the configured equivalence margin. These results remain visible in the local dashboard. They validate the integrated evaluation path, not broad model equivalence or deployment fitness. See `docs/VALIDATION.md` for the measured scores and limitations.
-
-Prepare the same benchmark samples with `venv/bin/python scripts/prepare_benchmarks.py`; prepared sets automatically appear in the dashboard. Model weights, downloaded data, and raw evidence remain outside Git.
+- [Release notes and compatibility changes](CHANGELOG.md)
+- [Submission and review guide](docs/SUBMISSION.md)
+- [Security reporting](SECURITY.md)
+- [License](LICENSE) — MIT; dependencies, datasets, and model weights retain their own licenses.

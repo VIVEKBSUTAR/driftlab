@@ -3,18 +3,34 @@
 The package is installed into an isolated target; imports must resolve to that
 wheel installation. No network, model weights, or editable source imports needed.
 """
+
 from pathlib import Path
 import os
 import subprocess
 import sys
 import tempfile
+import tomllib
 
 root = Path(__file__).resolve().parents[1]
-wheel = root / "dist" / "driftlab-0.1.0-py3-none-any.whl"
+version = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
+wheel = root / "dist" / f"driftlab-{version}-py3-none-any.whl"
 with tempfile.TemporaryDirectory(prefix="driftlab-wheel-check-") as directory:
     target = Path(directory) / "installed"
-    subprocess.run([sys.executable,"-m","pip","install","--no-deps","--target",str(target),str(wheel),"--disable-pip-version-check"],check=True)
-    code = r'''
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--no-deps",
+            "--target",
+            str(target),
+            str(wheel),
+            "--disable-pip-version-check",
+        ],
+        check=True,
+    )
+    code = r"""
 from pathlib import Path
 import json
 import re
@@ -23,13 +39,16 @@ sys.path.insert(0,sys.argv[1])
 import driftlab
 assert Path(driftlab.__file__).is_relative_to(Path(sys.argv[1])), driftlab.__file__
 from driftlab import DriftLab
-from driftlab.api.main import app
+from driftlab.api.main import create_app
+from driftlab.config.settings import Settings
 from fastapi.testclient import TestClient
-client=TestClient(app)
-response=client.get('/app/')
-assert response.status_code==200
-script=re.search(r'src="([^\"]+\.js)"',response.text).group(1)
-assert client.get(script).status_code==200
+app=create_app(Settings(workspace=Path(sys.argv[2]), worker_enabled=False))
+with TestClient(app, base_url='http://localhost', client=('127.0.0.1',1000)) as client:
+    response=client.get('/app/')
+    assert response.status_code==200
+    script=re.search(r'src="([^\"]+\.js)"',response.text).group(1)
+    assert client.get(script).status_code==200
+    assert client.get('/api/readyz').status_code==200
 lab=DriftLab(sys.argv[2])
 try:
     b=lab.run(repeats=5,seed=42)
@@ -42,6 +61,11 @@ try:
     print('PASS: installed wheel imports, bundled dashboard/assets, 320 generations, persisted drift evidence')
 finally:
     lab.close()
-'''
-    env = {**os.environ,"DRIFTLAB_WORKSPACE":str(Path(directory)/"workspace")}
-    subprocess.run([sys.executable,"-I","-c",code,str(target),str(Path(directory)/"workspace")],cwd=directory,env=env,check=True)
+"""
+    env = {**os.environ, "DRIFTLAB_WORKSPACE": str(Path(directory) / "workspace")}
+    subprocess.run(
+        [sys.executable, "-I", "-c", code, str(target), str(Path(directory) / "workspace")],
+        cwd=directory,
+        env=env,
+        check=True,
+    )

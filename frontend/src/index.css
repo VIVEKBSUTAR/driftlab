@@ -1941,3 +1941,11 @@ progress {
     transition: none!important;
   }
 }
+
+.access-gate {display:grid;place-items:center;min-height:100vh;padding:28px;max-width:600px;}
+.access-gate .form-panel {padding:36px;width:100%;}
+.access-gate .eyebrow {margin-top:24px;}
+.access-gate h1 {font-size:28px;margin:12px 0 16px;}
+.access-gate .btn {margin:24px 0 16px;}
+.access-gate small {display:block;line-height:1.8;}
+.badge-cancelled {color:#aab3c3;background:#232934;border-color:#414a5a;}

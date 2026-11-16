@@ -6,6 +6,7 @@ anything touches the database. The database is derived; the JSONL file is the so
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Union
 from sqlalchemy.orm import Session
@@ -22,10 +23,13 @@ def append_observation_record(
     """
     path = Path(jsonl_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    
-    with open(path, mode="a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    with os.fdopen(
+        os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600), mode="a", encoding="utf-8"
+    ) as f:
+        f.write(json.dumps(record, ensure_ascii=False, allow_nan=False) + "\n")
         f.flush()
+        os.fsync(f.fileno())
 
 
 def iter_observation_records(
@@ -97,6 +101,9 @@ def ingest_jsonl_to_database(
             raw_output=rec.get("raw_output", ""),
             latency_ms=rec.get("latency_ms", 0.0),
             error=rec.get("error"),
+            finish_reason=rec.get("finish_reason"),
+            prompt_tokens=rec.get("prompt_tokens"),
+            completion_tokens=rec.get("completion_tokens"),
         )
         session.add(obs)
         inserted_count += 1

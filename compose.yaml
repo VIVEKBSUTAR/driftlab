@@ -1,0 +1,51 @@
+services:
+  driftlab:
+    build: .
+    image: driftlab:0.2.0
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      DRIFTLAB_MODE: server
+      DRIFTLAB_API_KEY: ${DRIFTLAB_API_KEY:?Generate a strong key in your private .env file}
+      DRIFTLAB_COOKIE_SECURE: "true"
+      DRIFTLAB_ALLOWED_HOSTS: ${DRIFTLAB_ALLOWED_HOSTS:?Set the public hostname and localhost}
+      DRIFTLAB_ALLOWED_ORIGINS: ${DRIFTLAB_ALLOWED_ORIGINS:?Set the public HTTPS origin}
+      DRIFTLAB_OLLAMA_URL: ${DRIFTLAB_OLLAMA_URL:-http://host.docker.internal:11434}
+      DRIFTLAB_POLICY_FILE: /etc/driftlab/policies.json
+    volumes:
+      - workspace:/var/lib/driftlab
+      - ./deploy/policies.json:/etc/driftlab/policies.json:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 1g
+    cpus: 2
+    stop_grace_period: 150s
+  proxy:
+    image: caddy:2
+    profiles: [tls]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DRIFTLAB_DOMAIN: ${DRIFTLAB_DOMAIN:?Set a DNS name resolving to this server}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      driftlab:
+        condition: service_healthy
+    security_opt: [no-new-privileges:true]
+volumes:
+  workspace:
+  caddy_data:
+  caddy_config:

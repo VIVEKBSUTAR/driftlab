@@ -60,9 +60,13 @@ def format_drift_markdown_report(
     if baseline_info or candidate_info:
         lines.append("## Evaluation Context")
         if baseline_info:
-            lines.append(f"- **Baseline**: `{baseline_info.get('identifier', 'N/A')}` (digest: `{baseline_info.get('digest', 'N/A')}`)")
+            lines.append(
+                f"- **Baseline**: `{baseline_info.get('identifier', 'N/A')}` (digest: `{baseline_info.get('digest', 'N/A')}`)"
+            )
         if candidate_info:
-            lines.append(f"- **Candidate**: `{candidate_info.get('identifier', 'N/A')}` (digest: `{candidate_info.get('digest', 'N/A')}`)")
+            lines.append(
+                f"- **Candidate**: `{candidate_info.get('identifier', 'N/A')}` (digest: `{candidate_info.get('digest', 'N/A')}`)"
+            )
         lines.append("")
 
     lines.append("## Statistical Tests & Equivalence Checks")
@@ -77,8 +81,12 @@ def format_drift_markdown_report(
         lines.append(f"### `{v.category}` - `{v.metric_id}`: {badge}")
         lines.append(f"- **Decision**: {v.explanation}")
         lines.append(f"- **Point Estimate**: {v.estimate:+.4f}")
-        lines.append(f"- **Confidence Interval** ({100 * v.details.get('confidence_level', 1 - v.details.get('alpha', 0.05)):.1f}%): [{v.ci_low:+.4f}, {v.ci_high:+.4f}]")
-        lines.append(f"- **Adjusted p-value**: {v.p_adjusted:.4g} (alpha={v.details.get('alpha', 'default')})")
+        lines.append(
+            f"- **Confidence Interval** ({100 * v.details.get('confidence_level', 1 - v.details.get('alpha', 0.05)):.1f}%): [{v.ci_low:+.4f}, {v.ci_high:+.4f}]"
+        )
+        lines.append(
+            f"- **Adjusted p-value**: {v.p_adjusted:.4g} (alpha={v.details.get('alpha', 'default')})"
+        )
         lines.append(f"- **Equivalence Margin**: ±{v.margin:.4f}")
         lines.append(f"- **Noise Floor**: {v.noise_floor:.4f}")
         lines.append("")
@@ -90,18 +98,20 @@ def format_drift_json(verdicts: List[DriftVerdict]) -> str:
     """Serializes verdicts into an indented JSON string."""
     data = []
     for v in verdicts:
-        data.append({
-            "category": v.category,
-            "metric_id": v.metric_id,
-            "risk_level": v.risk_level,
-            "status": v.status,
-            "estimate": v.estimate,
-            "ci_low": v.ci_low,
-            "ci_high": v.ci_high,
-            "p_value": v.p_value,
-            "p_adjusted": v.p_adjusted,
-            "noise_floor": v.noise_floor,
-            "margin": v.margin,
-            "explanation": v.explanation,
-        })
+        data.append(
+            {
+                "category": v.category,
+                "metric_id": v.metric_id,
+                "risk_level": v.risk_level,
+                "status": v.status,
+                "estimate": v.estimate,
+                "ci_low": v.ci_low,
+                "ci_high": v.ci_high,
+                "p_value": v.p_value,
+                "p_adjusted": v.p_adjusted,
+                "noise_floor": v.noise_floor,
+                "margin": v.margin,
+                "explanation": v.explanation,
+            }
+        )
     return json.dumps(data, indent=2)

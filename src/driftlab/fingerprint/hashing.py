@@ -27,15 +27,17 @@ def hash_dataset(tasks: List[Dict[str, Any]]) -> str:
     """
     normalized = []
     for t in sorted(tasks, key=lambda x: str(x.get("task_key") or x.get("id") or "")):
-        normalized.append({
-            "task_key": t.get("task_key"),
-            "category": t.get("category"),
-            "risk_level": t.get("risk_level"),
-            "prompt": t.get("prompt"),
-            "system_prompt": t.get("system_prompt"),
-            "expected_output": t.get("expected_output"),
-            "output_spec": t.get("output_spec"),
-        })
+        normalized.append(
+            {
+                "task_key": t.get("task_key"),
+                "category": t.get("category"),
+                "risk_level": t.get("risk_level"),
+                "prompt": t.get("prompt"),
+                "system_prompt": t.get("system_prompt"),
+                "expected_output": t.get("expected_output"),
+                "output_spec": t.get("output_spec"),
+            }
+        )
     return hash_object(normalized)
 
 

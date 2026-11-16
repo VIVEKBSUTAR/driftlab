@@ -16,13 +16,19 @@ from sqlalchemy.orm import Session
 
 from driftlab.adapters.base import ModelAdapter, GenerationConfig
 from driftlab.metrics.functions import compute_metric, METRIC_REGISTRY
-from driftlab.store.jsonl import append_observation_record, ingest_jsonl_to_database
+from driftlab.store.jsonl import (
+    append_observation_record,
+    ingest_jsonl_to_database,
+    read_observation_records,
+)
+from driftlab.store.artifacts import recover_tail
 from driftlab.store.models import MetricResult, PromptAggregate, Run, Observation
 
 
 @dataclass
 class TaskItem:
     """Represents a discrete prompt task to be executed."""
+
     id: str
     task_key: str
     category: str
@@ -36,6 +42,7 @@ class TaskItem:
 @dataclass
 class RunnerResult:
     """Container for the results of a benchmark run execution."""
+
     run_id: str
     jsonl_path: str
     total_prompts: int
@@ -77,6 +84,8 @@ class BenchmarkRunner:
         run_id: str,
         jsonl_path: Union[str, Path],
         db_session: Optional[Session] = None,
+        check_control=None,
+        resume: bool = False,
     ) -> RunnerResult:
         """
         Runs all tasks across k repeats. Outputs are streamed immediately to JSONL.
@@ -86,11 +95,31 @@ class BenchmarkRunner:
             t.id: {m: [] for m in self.metric_names} for t in tasks
         }
         observations_count = 0
+        cached = {}
+        scored_keys = set()
+        if resume:
+            recover_tail(Path(jsonl_path_str))
+            recover_tail(Path(jsonl_path_str + ".scores.jsonl"))
+            for record in read_observation_records(jsonl_path_str):
+                key = (record["task_id"], record["repeat_index"])
+                if key in cached or record["run_id"] != run_id:
+                    raise ValueError("Duplicate or mismatched raw evidence; refusing to resume")
+                cached[key] = record
+            scored_keys = {
+                (r["task_id"], r["repeat_index"])
+                for r in read_observation_records(jsonl_path_str + ".scores.jsonl")
+            }
 
         for task_idx, task in enumerate(tasks):
             for repeat_idx in range(self.repeats):
                 # Derive deterministic seed per repeat
-                repeat_seed = self.seed_base + (task_idx * 1000) + repeat_idx
+                if check_control:
+                    check_control()
+                repeat_seed = int(
+                    np.random.SeedSequence([self.seed_base, task_idx, repeat_idx]).generate_state(
+                        1, dtype=np.uint64
+                    )[0]
+                ) & ((1 << 63) - 1)
                 config_with_seed = GenerationConfig(
                     temperature=self.generation_config.temperature,
                     top_p=self.generation_config.top_p,
@@ -100,44 +129,76 @@ class BenchmarkRunner:
                     timeout_seconds=self.generation_config.timeout_seconds,
                 )
 
-                started = time.perf_counter()
-                try:
-                    gen_res = self.adapter.generate(prompt=task.prompt, system_prompt=task.system_prompt, config=config_with_seed)
-                except Exception as exc:
-                    gen_res = {"text": "", "error": str(exc), "latency_ms": (time.perf_counter()-started)*1000}
-
-                # Safely retrieve response fields from GenerationResult dict or object
-                text = gen_res["text"] if isinstance(gen_res, dict) else getattr(gen_res, "text", "")
-                latency_ms = gen_res.get("latency_ms", 0.0) if isinstance(gen_res, dict) else getattr(gen_res, "latency_ms", 0.0)
-                error = gen_res.get("error") if isinstance(gen_res, dict) else getattr(gen_res, "error", None)
-
-                # Append raw output immediately to JSONL (source of truth)
-                record = {
-                    "run_id": run_id,
-                    "task_id": task.id,
-                    "repeat_index": repeat_idx,
-                    "seed": repeat_seed,
-                    "raw_output": text,
-                    "latency_ms": latency_ms,
-                    "error": error,
-                }
-                append_observation_record(jsonl_path_str, record)
+                key = (task.id, repeat_idx)
+                if key in cached:
+                    record = cached[key]
+                    if record["seed"] != repeat_seed:
+                        raise ValueError("Generation seed does not match stored evidence")
+                    text, latency_ms, error = (
+                        record["raw_output"],
+                        record["latency_ms"],
+                        record.get("error"),
+                    )
+                else:
+                    started = time.perf_counter()
+                    try:
+                        result = self.adapter.generate(
+                            prompt=task.prompt,
+                            system_prompt=task.system_prompt,
+                            config=config_with_seed,
+                        )
+                        if not isinstance(result, dict) or not isinstance(result.get("text"), str):
+                            raise ValueError("Adapter must return a text string")
+                        text = result["text"]
+                        latency_ms = float(
+                            result.get("latency_ms", (time.perf_counter() - started) * 1000)
+                        )
+                        if not np.isfinite(latency_ms) or latency_ms < 0:
+                            raise ValueError("Adapter latency must be finite and nonnegative")
+                        error = result.get("error")
+                    except Exception as exc:
+                        result = {}
+                        text, error = "", str(exc)
+                        latency_ms = (time.perf_counter() - started) * 1000
+                    record = {
+                        "run_id": run_id,
+                        "task_id": task.id,
+                        "repeat_index": repeat_idx,
+                        "seed": repeat_seed,
+                        "raw_output": text,
+                        "latency_ms": latency_ms,
+                        "error": error,
+                        "finish_reason": result.get("finish_reason"),
+                        "prompt_tokens": result.get("prompt_tokens"),
+                        "completion_tokens": result.get("completion_tokens"),
+                    }
+                    append_observation_record(jsonl_path_str, record)
                 observations_count += 1
 
                 if error:
                     raise RuntimeError(f"Generation failed for {task.task_key}: {error}")
                 scores = {}
                 for metric_name in self.metric_names:
-                    val = compute_metric(metric_name=metric_name, prediction=text,
+                    val = compute_metric(
+                        metric_name=metric_name,
+                        prediction=text,
                         reference=task.expected_output,
-                        answer_type=task.output_spec.get("answer_type") if task.output_spec else None,
-                        required_keys=task.output_spec.get("required_keys") if task.output_spec else None)
+                        answer_type=task.output_spec.get("answer_type")
+                        if task.output_spec
+                        else None,
+                        required_keys=task.output_spec.get("required_keys")
+                        if task.output_spec
+                        else None,
+                    )
                     if not np.isfinite(val):
                         raise ValueError(f"Non-finite score from {metric_name}")
                     metric_values[task.id][metric_name].append(val)
                     scores[metric_name] = val
                 # Raw output was already flushed; scoring errors cannot erase it.
-                append_observation_record(str(jsonl_path_str) + ".scores.jsonl", {**record, "scores": scores})
+                if key not in scored_keys:
+                    append_observation_record(
+                        str(jsonl_path_str) + ".scores.jsonl", {**record, "scores": scores}
+                    )
 
         # Compute prompt-level aggregates (mean and std across repeats)
         aggregates: Dict[str, Dict[str, Dict[str, float]]] = {}
